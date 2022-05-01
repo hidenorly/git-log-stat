@@ -98,7 +98,7 @@ class GitUtil
 	end
 
 	def self.getLogNumStat(gitPath, separator="#####", gitOptions=nil)
-		exec_cmd = "git log --numstat --pretty=\"#####:%h:%s\""
+		exec_cmd = "git log --numstat --pretty=\"#{separator}:%h:%s\""
 		exec_cmd += " #{gitOptions}" if gitOptions
 		exec_cmd += " 2>/dev/null"
 
