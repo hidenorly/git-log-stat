@@ -97,11 +97,76 @@ class GitUtil
 		return _ensureSha1(result.to_s)
 	end
 
+	def self._parseNumStatOneLine(aLine)
+		filename = ""
+		aResult = {:added=>0, :removed=>0}
+
+		if !aLine.start_with?("#####") then
+			added = 0
+			removed = 0
+
+			aLine.strip!
+			theResult = aLine.split(" ")
+			count = 0
+			theResult.each do |aResult|
+				found = false
+				aResult.strip!
+
+				case count
+				when 0
+					added = aResult.to_i
+					found = true
+				when 1
+					removed = aResult.to_i
+					found = true
+				when 2
+					filename = aResult
+					found = true
+				else
+					count = 0
+				end
+
+				count = count + 1 if found
+			end
+
+
+			if count == 3 then
+				aResult = {:added=>added, :removed=>removed}
+			else
+				filename = ""
+			end
+		end
+
+		return filename, aResult
+	end
+
+	def self._parseNumStat(numStatResult)
+		result = {}
+
+		numStatResult.each do |aLine|
+			aFile, aResult = _parseNumStatOneLine(aLine)
+
+
+			if !aFile.empty? then
+				if result.has_key?(aFile) then
+					theResult = result[aFile]
+					theResult[:added]   = theResult[:added] + aResult[:added]
+					theResult[:removed] = theResult[:removed] + aResult[:removed]
+					result[aFile] = theResult
+				else
+					result[aFile] = aResult
+				end
+			end
+		end
+
+		return result
+	end
+
 	def self.getLogNumStat(gitPath, separator="#####", gitOptions=nil)
 		exec_cmd = "git log --numstat --pretty=\"#{separator}:%h:%s\""
 		exec_cmd += " #{gitOptions}" if gitOptions
 		exec_cmd += " 2>/dev/null"
 
-		return ExecUtil.getExecResultEachLine(exec_cmd, gitPath)
+		return _parseNumStat( ExecUtil.getExecResultEachLine(exec_cmd, gitPath) )
 	end
 end

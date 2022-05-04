@@ -46,8 +46,14 @@ class ResultCollector
 	def report()
 		@_mutex.synchronize {
 			@result.each do |gitPath, result|
-				result.each do |aResult|
-					puts aResult
+				if result.is_a?(Hash) then
+					result.each do |filename, _result|
+						puts "#{filename}, #{_result[:added]}, #{_result[:removed]}"
+					end
+				else
+					result.each do |aVal|
+						puts aVal
+					end
 				end
 			end
 		}
@@ -64,7 +70,7 @@ class ExecGitLogStat < TaskAsync
 	end
 
 	def execute
-		result = []
+		result = {}
 
 		if( FileTest.directory?(@gitPath) ) then
 			result = GitUtil.getLogNumStat(@gitPath, "#####", @options[:gitOptions]);
