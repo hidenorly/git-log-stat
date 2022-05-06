@@ -34,28 +34,47 @@ end
 
 
 class ResultCollector
-	def initialize()
+	def initialize( outputFormat )
 		@result = {}
 		@_mutex = Mutex.new
+		@outputFormat = outputFormat
 	end
 	def onResult( gitPath, result )
 		@_mutex.synchronize {
 			@result[ gitPath ] = result
 		}
 	end
+	def dumpMarkdown
+		puts "|| gitPath || filename || added || removed ||"
+		@result.each do |gitPath, result|
+			result.each do |filename, _result|
+				puts "| #{gitPath} | #{filename} | #{_result[:added]} | #{_result[:removed]} |"
+			end
+		end
+	end
+	def dumpJson
+		puts "{"
+		@result.each do |gitPath, result|
+			puts "  \"#{gitPath}\" : {"
+			result.each do |filename, _result|
+				puts "    \"#{filename}\" : { \"added\":#{_result[:added]}, \"removed\":#{_result[:removed]} },"
+			end
+			puts "  }"
+		end
+		puts "}"
+	end
+	def dumpCsv
+		@result.each do |gitPath, result|
+			result.each do |filename, _result|
+				puts "\"#{gitPath}\", \"#{filename}\", #{_result[:added]}, #{_result[:removed]}"
+			end
+		end
+	end
 	def report()
 		@_mutex.synchronize {
-			@result.each do |gitPath, result|
-				if result.is_a?(Hash) then
-					result.each do |filename, _result|
-						puts "#{filename}, #{_result[:added]}, #{_result[:removed]}"
-					end
-				else
-					result.each do |aVal|
-						puts aVal
-					end
-				end
-			end
+			dumpMarkdown() if @outputFormat == "markdown"
+			dumpCsv() if @outputFormat == "csv"
+			dumpJson() if @outputFormat == "json"
 		}
 	end
 end
@@ -90,6 +109,7 @@ end
 options = {
 	:verbose => false,
 	:gitOptions	=> "",
+	:outputFormat => "csv",
 	:numOfThreads => TaskManagerAsync.getNumberOfProcessor(),
 }
 
@@ -109,13 +129,19 @@ opt_parser = OptionParser.new do |opts|
 	opts.on("-o", "--gitOpt=", "Specify git options --gitOpt='--oneline', etc.") do |gitOptions|
 		options[:gitOptions] = gitOptions
 	end
+
+	opts.on("", "--outputFormat=", "Specify markdown or csv or json (default:#{options[:outputFormat]})") do |outputFormat|
+		outputFormat.strip!
+		outputFormat.downcase!
+		options[:outputFormat] = outputFormat if outputFormat == "csv" || outputFormat == "markdown" || outputFormat == "json"
+	end
 end.parse!
 
 
 # common
 taskMan = TaskManagerAsync.new( options[:numOfThreads].to_i )
 
-resultCollector = ResultCollector.new()
+resultCollector = ResultCollector.new( options[:outputFormat] )
 
 gitPaths = ARGV.clone()
 gitPaths.push(".") if gitPaths.empty?
