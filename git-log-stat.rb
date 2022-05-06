@@ -34,10 +34,11 @@ end
 
 
 class ResultCollector
-	def initialize( outputFormat )
+	def initialize( outputFormat, enableGitPathOutput )
 		@result = {}
 		@_mutex = Mutex.new
 		@outputFormat = outputFormat
+		@enableGitPathOutput = enableGitPathOutput
 	end
 	def onResult( gitPath, result )
 		@_mutex.synchronize {
@@ -45,28 +46,44 @@ class ResultCollector
 		}
 	end
 	def dumpMarkdown
-		puts "|| gitPath || filename || added || removed ||"
+		if @enableGitPathOutput then
+			puts "|| gitPath || filename || added || removed ||"
+		else
+			puts "|| filename || added || removed ||"
+		end
 		@result.each do |gitPath, result|
 			result.each do |filename, _result|
-				puts "| #{gitPath} | #{filename} | #{_result[:added]} | #{_result[:removed]} |"
+				if @enableGitPathOutput then
+					puts "| #{gitPath} | #{filename} | #{_result[:added]} | #{_result[:removed]} |"
+				else
+					puts "| #{filename} | #{_result[:added]} | #{_result[:removed]} |"
+				end
 			end
 		end
 	end
 	def dumpJson
 		puts "{"
 		@result.each do |gitPath, result|
-			puts "  \"#{gitPath}\" : {"
+			if @enableGitPathOutput then
+				puts "  \"#{gitPath}\" : {"
+			end
 			result.each do |filename, _result|
 				puts "    \"#{filename}\" : { \"added\":#{_result[:added]}, \"removed\":#{_result[:removed]} },"
 			end
-			puts "  }"
+			if @enableGitPathOutput then
+				puts "  }"
+			end
 		end
 		puts "}"
 	end
 	def dumpCsv
 		@result.each do |gitPath, result|
 			result.each do |filename, _result|
-				puts "\"#{gitPath}\", \"#{filename}\", #{_result[:added]}, #{_result[:removed]}"
+				if @enableGitPathOutput then
+					puts "\"#{gitPath}\", \"#{filename}\", #{_result[:added]}, #{_result[:removed]}"
+				else
+					puts "\"#{filename}\", #{_result[:added]}, #{_result[:removed]}"
+				end
 			end
 		end
 	end
@@ -110,6 +127,7 @@ options = {
 	:verbose => false,
 	:gitOptions	=> "",
 	:outputFormat => "csv",
+	:enableGitPathOutput => true,
 	:numOfThreads => TaskManagerAsync.getNumberOfProcessor(),
 }
 
@@ -135,13 +153,17 @@ opt_parser = OptionParser.new do |opts|
 		outputFormat.downcase!
 		options[:outputFormat] = outputFormat if outputFormat == "csv" || outputFormat == "markdown" || outputFormat == "json"
 	end
+
+	opts.on("", "--disableGitPathOutput", "Specify if you don't want to output gitPath as 1st col.") do |disableGitPathOutput|
+		options[:enableGitPathOutput] = false
+	end
 end.parse!
 
 
 # common
 taskMan = TaskManagerAsync.new( options[:numOfThreads].to_i )
 
-resultCollector = ResultCollector.new( options[:outputFormat] )
+resultCollector = ResultCollector.new( options[:outputFormat], options[:enableGitPathOutput] )
 
 gitPaths = ARGV.clone()
 gitPaths.push(".") if gitPaths.empty?
