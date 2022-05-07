@@ -97,11 +97,11 @@ class GitUtil
 		return _ensureSha1(result.to_s)
 	end
 
-	def self._parseNumStatOneLine(aLine)
+	def self._parseNumStatOneLine(aLine, separator="#####")
 		filename = ""
 		aResult = {:added=>0, :removed=>0}
 
-		if !aLine.start_with?("#####") then
+		if !aLine.start_with?(separator) then
 			added = 0
 			removed = 0
 
@@ -140,11 +140,11 @@ class GitUtil
 		return filename, aResult
 	end
 
-	def self._parseNumStat(numStatResult)
+	def self.parseNumStatPefFile(numStatResult, separator="#####")
 		result = {}
 
 		numStatResult.each do |aLine|
-			aFile, aResult = _parseNumStatOneLine(aLine)
+			aFile, aResult = _parseNumStatOneLine(aLine, separator)
 
 
 			if !aFile.empty? then
@@ -167,6 +167,6 @@ class GitUtil
 		exec_cmd += " #{gitOptions}" if gitOptions
 		exec_cmd += " 2>/dev/null"
 
-		return _parseNumStat( ExecUtil.getExecResultEachLine(exec_cmd, gitPath) )
+		return ExecUtil.getExecResultEachLine(exec_cmd, gitPath)
 	end
 end
