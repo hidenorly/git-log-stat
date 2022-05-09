@@ -162,8 +162,46 @@ class GitUtil
 		return result
 	end
 
+	def self._parseAuthor(aLine, separator = "#####}")
+		author = ""
+		pos1 = aLine.index(":", separator.length+1)
+		if pos1!=nil then
+			pos2 = aLine.index(":", pos1+1)
+			if pos2!=nil then
+				author = aLine.slice(pos1+1, pos2-pos1-1)
+			end
+		end
+		return author
+	end
+
+	def self.parseNumStatPerAuthor(numStatResult, separator="#####")
+		result = {}
+		author = ""
+
+		numStatResult.each do |aLine|
+			if aLine.start_with?(separator) then
+				author = _parseAuthor(aLine, separator)
+			else
+				aFile, aResult = _parseNumStatOneLine(aLine, separator)
+
+				if !aFile.empty? && !author.empty? then
+					if result.has_key?(author) then
+						theResult = result[author]
+						theResult[:added]   = theResult[:added] + aResult[:added]
+						theResult[:removed] = theResult[:removed] + aResult[:removed]
+						result[author] = theResult
+					else
+						result[author] = aResult
+					end
+				end
+			end
+		end
+
+		return result
+	end
+
 	def self.getLogNumStat(gitPath, separator="#####", gitOptions=nil)
-		exec_cmd = "git log --numstat --pretty=\"#{separator}:%h:%s\""
+		exec_cmd = "git log --numstat --pretty=\"#{separator}:%h:%an:%s\""
 		exec_cmd += " #{gitOptions}" if gitOptions
 		exec_cmd += " 2>/dev/null"
 

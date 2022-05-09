@@ -48,13 +48,18 @@ class ResultCollector
 		}
 	end
 
+	def get2ndFieldName()
+		return "author" if @mode == "author"
+		return "filename"
+	end
+
 	# synchronized
 	def dumpMarkdown
 		if @enableGitPathOutput then
-			puts "| gitPath | filename | added | removed |"
+			puts "| gitPath | #{get2ndFieldName()} | added | removed |"
 			puts "| :--- | :--- | ---: | ---: |"
 		else
-			puts "| filename | added | removed |"
+			puts "| #{get2ndFieldName()} | added | removed |"
 			puts "| :--- | ---: | ---: |"
 		end
 		@result.each do |gitPath, result|
@@ -158,7 +163,7 @@ class ResultCollector
 	def report()
 		@_mutex.synchronize {
 			case @mode
-			when "file"
+			when "file",  "author"
 				#@result is already per-file then no need to do additionally
 				dumpMarkdown() if @outputFormat == "markdown"
 				dumpCsv() if @outputFormat == "csv"
@@ -190,7 +195,11 @@ class ExecGitLogStat < TaskAsync
 
 		if( FileTest.directory?(@gitPath) ) then
 			git_log_result = GitUtil.getLogNumStat(@gitPath, COMMIT_SEPARATOR, @options[:gitOptions]);
-			result = GitUtil.parseNumStatPefFile( git_log_result, COMMIT_SEPARATOR )
+			if @options[:mode]=="author" then
+				result = GitUtil.parseNumStatPerAuthor( git_log_result, COMMIT_SEPARATOR )
+			else
+				result = GitUtil.parseNumStatPefFile( git_log_result, COMMIT_SEPARATOR )
+			end
 		else
 			puts "\n#{@gitPath} is not existed)" if @options[:verbose]
 		end
@@ -228,7 +237,7 @@ opt_parser = OptionParser.new do |opts|
 	cmds = ""
 	opts.banner = "Usage: #{cmds} gitDir1 gitDir2 ..."
 
-	opts.on("-m", "--mode=", "Specify analysis mode: file or git (default:#{options[:mode]})") do |mode|
+	opts.on("-m", "--mode=", "Specify analysis mode: file or git or author(default:#{options[:mode]})") do |mode|
 		options[:mode] = mode
 	end
 
