@@ -201,6 +201,15 @@ class ExecGitLogStat < TaskAsync
 end
 
 
+class GitOptionUtil
+	def self.filterAuthor(gitOptions, author)
+		if author then
+			gitOptions = gitOptions + " --author=#{author}"
+		end
+		return gitOptions
+	end
+end
+
 
 
 #---- main --------------------------
@@ -210,6 +219,7 @@ options = {
 	:outputFormat => "csv",
 	:enableGitPathOutput => true,
 	:mode => "file",
+	:author => nil,
 	:numOfThreads => TaskManagerAsync.getNumberOfProcessor(),
 }
 
@@ -230,6 +240,10 @@ opt_parser = OptionParser.new do |opts|
 		outputFormat.strip!
 		outputFormat.downcase!
 		options[:outputFormat] = outputFormat if outputFormat == "csv" || outputFormat == "markdown" || outputFormat == "json"
+	end
+
+	opts.on("-a", "--author=", "Specify author if want to filter with") do |author|
+		options[:author] = author
 	end
 
 	opts.on("", "--disableGitPathOutput", "Specify if you don't want to output gitPath as 1st col.") do |disableGitPathOutput|
@@ -253,6 +267,9 @@ resultCollector = ResultCollector.new( options[:mode], options[:outputFormat], o
 
 gitPaths = ARGV.clone()
 gitPaths.push(".") if gitPaths.empty?
+
+
+options[:gitOptions] = GitOptionUtil.filterAuthor(options[:gitOptions], options[:author])
 
 gitPaths.each do |aPath|
 	taskMan.addTask( ExecGitLogStat.new( aPath, resultCollector, options ) )
