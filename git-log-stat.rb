@@ -30,14 +30,23 @@ class HashUtil
 		end
 		return result
 	end
+
+	def self.toArrayFromHash(srHash)
+		result = []
+		srHash.each do |key, value|
+			result.push( {:key=>key, :value=>value} )
+		end
+		return result
+	end
 end
 
 
 class ResultCollector
-	def initialize( mode, outputFormat, enableGitPathOutput )
+	def initialize( mode, sort, outputFormat, enableGitPathOutput )
 		@result = {}
 		@_mutex = Mutex.new
 		@mode = mode
+		@sort = sort
 		@outputFormat = outputFormat
 		@enableGitPathOutput = enableGitPathOutput
 	end
@@ -63,7 +72,9 @@ class ResultCollector
 			puts "| :--- | ---: | ---: |"
 		end
 		@result.each do |gitPath, result|
-			result.each do |filename, _result|
+			result.each do |theResult|
+				filename = theResult[:key]
+				_result = theResult[:value]
 				if @enableGitPathOutput then
 					puts "| #{gitPath} | #{filename} | #{_result[:added]} | #{_result[:removed]} |"
 				else
@@ -82,7 +93,8 @@ class ResultCollector
 			puts "| added | removed ||"
 			puts "| ---: | ---: |"
 		end
-		@result.each do |gitPath, result|
+		@result.each do |gitPath, _result|
+			result = _result[:value]
 			if @enableGitPathOutput then
 				puts "| #{gitPath} | #{result[:added]} | #{result[:removed]} |"
 			else
@@ -98,7 +110,9 @@ class ResultCollector
 			if @enableGitPathOutput then
 				puts "  \"#{gitPath}\" : {"
 			end
-			result.each do |filename, _result|
+			result.each do |theResult|
+				filename = theResult[:key]
+				_result = theResult[:value]
 				puts "    \"#{filename}\" : { \"added\":#{_result[:added]}, \"removed\":#{_result[:removed]} },"
 			end
 			if @enableGitPathOutput then
@@ -111,7 +125,9 @@ class ResultCollector
 	# synchronized
 	def dumpJsonPerGit
 		puts "["
-		@result.each do |gitPath, result|
+		@result.each do |gitPath, theResult|
+			result = theResult[:value]
+
 			if @enableGitPathOutput then
 				puts "  \"#{gitPath}\" : {\"added\":#{result[:added]}, \"removed\":#{result[:removed]} },"
 			else
@@ -124,7 +140,9 @@ class ResultCollector
 	# synchronized
 	def dumpCsv
 		@result.each do |gitPath, result|
-			result.each do |filename, _result|
+			result.each do |theResult|
+				filename = theResult[:key]
+				_result = theResult[:value]
 				if @enableGitPathOutput then
 					puts "\"#{gitPath}\", \"#{filename}\", #{_result[:added]}, #{_result[:removed]}"
 				else
@@ -136,7 +154,8 @@ class ResultCollector
 
 	# synchronized
 	def dumpCsvPerGit
-		@result.each do |gitPath, result|
+		@result.each do |gitPath, _result|
+			result = _result[:value]
 			if @enableGitPathOutput then
 				puts "\"#{gitPath}\", #{result[:added]}, #{result[:removed]}"
 			else
@@ -151,7 +170,9 @@ class ResultCollector
 		@result.each do |gitPath, aResult|
 			added = 0
 			removed = 0
-			aResult.each do |filename, _result|
+			aResult.each do | theResult |
+				filename = theResult[:key]
+				_result = theResult[:value]
 				added = added + _result[:added]
 				removed = removed + _result[:removed]
 			end
@@ -160,8 +181,25 @@ class ResultCollector
 		@result = result
 	end
 
+	# synchronized
+	def sortResult
+		result = {}
+		@result.each do |gitPath, aResult|
+			theResult = HashUtil.toArrayFromHash( aResult )			
+			case @sort
+			when "straight"
+				theResult.sort!{|b, a| (a[:value][:added]+a[:value][:removed]) <=> (b[:value][:added]+b[:value][:removed]) }
+			when "reverse"
+				theResult.sort!{|a, b| (a[:value][:added]+a[:value][:removed]) <=> (b[:value][:added]+b[:value][:removed]) }
+			end
+			result[gitPath] = theResult
+		end
+		@result = result
+	end
+
 	def report()
 		@_mutex.synchronize {
+			sortResult()
 			case @mode
 			when "file",  "author"
 				#@result is already per-file then no need to do additionally
@@ -228,6 +266,7 @@ options = {
 	:outputFormat => "csv",
 	:enableGitPathOutput => true,
 	:mode => "file",
+	:sort => "none",
 	:author => nil,
 	:numOfThreads => TaskManagerAsync.getNumberOfProcessor(),
 }
@@ -255,6 +294,10 @@ opt_parser = OptionParser.new do |opts|
 		options[:author] = author
 	end
 
+	opts.on("-s", "--sort=", "Specify sort mode: none, straight, reverse (default:#{options[:sort]})") do |sort|
+		options[:sort] = sort
+	end
+
 	opts.on("", "--disableGitPathOutput", "Specify if you don't want to output gitPath as 1st col.") do |disableGitPathOutput|
 		options[:enableGitPathOutput] = false
 	end
@@ -272,7 +315,7 @@ end.parse!
 # common
 taskMan = TaskManagerAsync.new( options[:numOfThreads].to_i )
 
-resultCollector = ResultCollector.new( options[:mode], options[:outputFormat], options[:enableGitPathOutput] )
+resultCollector = ResultCollector.new( options[:mode], options[:sort], options[:outputFormat], options[:enableGitPathOutput] )
 
 gitPaths = ARGV.clone()
 gitPaths.push(".") if gitPaths.empty?
