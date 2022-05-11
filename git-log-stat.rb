@@ -221,10 +221,11 @@ end
 class ExecGitLogStat < TaskAsync
 	COMMIT_SEPARATOR = "#####"
 
-	def initialize(gitPath, resultCollector, options)
+	def initialize(gitPath, resultCollector, gitOptions, options)
 		super("ExecGitLogStat::#{gitPath}")
 		@gitPath = gitPath
 		@resultCollector = resultCollector
+		@gitOptions = gitOptions
 		@options = options
 	end
 
@@ -232,7 +233,7 @@ class ExecGitLogStat < TaskAsync
 		result = {}
 
 		if( FileTest.directory?(@gitPath) ) then
-			git_log_result = GitUtil.getLogNumStat(@gitPath, COMMIT_SEPARATOR, @options[:gitOptions]);
+			git_log_result = GitUtil.getLogNumStat(@gitPath, COMMIT_SEPARATOR, @gitOptions);
 			if @options[:mode]=="author" then
 				result = GitUtil.parseNumStatPerAuthor( git_log_result, COMMIT_SEPARATOR )
 			else
@@ -255,6 +256,28 @@ class GitOptionUtil
 		end
 		return gitOptions
 	end
+
+	def self.filterDuration(gitOptions, duration)
+		if duration then
+			case duration
+			when "day"
+				gitOptions = gitOptions + " --after=\"1 day ago\""
+			when "month"
+				gitOptions = gitOptions + " --after=\"1 month ago\""
+			when "year"
+				gitOptions = gitOptions + " --after=\"1 year ago\""
+			else
+				if duration.start_with?("from:") then
+					pos = duration.index(":")
+					fromDate = duration.slice( pos + 1, duration.length - pos - 1 )
+					if !fromDate.empty? then
+						gitOptions = gitOptions + " --after=#{fromDate}"
+					end
+				end
+			end
+		end
+		return gitOptions
+	end
 end
 
 
@@ -266,6 +289,7 @@ options = {
 	:outputFormat => "csv",
 	:enableGitPathOutput => true,
 	:mode => "file",
+	:duration => "full",
 	:sort => "none",
 	:author => nil,
 	:numOfThreads => TaskManagerAsync.getNumberOfProcessor(),
@@ -278,6 +302,10 @@ opt_parser = OptionParser.new do |opts|
 
 	opts.on("-m", "--mode=", "Specify analysis mode: file or git or author(default:#{options[:mode]})") do |mode|
 		options[:mode] = mode
+	end
+
+	opts.on("-d", "--duration=", "Specify analyzing duration: full, day, month(=last 1 month), year, e.g. from:2021-04-01 (default:#{options[:duration]})") do |duration|
+		options[:duration] = duration
 	end
 
 	opts.on("-o", "--gitOpt=", "Specify git options --gitOpt='--oneline', etc.") do |gitOptions|
@@ -322,9 +350,10 @@ gitPaths.push(".") if gitPaths.empty?
 
 
 options[:gitOptions] = GitOptionUtil.filterAuthor(options[:gitOptions], options[:author])
+options[:gitOptions] = GitOptionUtil.filterDuration(options[:gitOptions], options[:duration])
 
 gitPaths.each do |aPath|
-	taskMan.addTask( ExecGitLogStat.new( aPath, resultCollector, options ) )
+	taskMan.addTask( ExecGitLogStat.new( aPath, resultCollector, options[:gitOptions], options ) )
 end
 
 taskMan.executeAll()
