@@ -51,9 +51,14 @@ class ResultCollector
 		@enableGitPathOutput = enableGitPathOutput
 	end
 
-	def onResult( gitPath, result )
+	def onResult( gitPath, duration, result )
 		@_mutex.synchronize {
-			@result[ gitPath ] = result
+			_result = {}
+			if @result.has_key?( gitPath ) then
+				_result = @result[ gitPath ]
+			end
+			_result[ duration ] = result
+			@result[ gitPath ] = _result
 		}
 	end
 
@@ -65,20 +70,22 @@ class ResultCollector
 	# synchronized
 	def dumpMarkdown
 		if @enableGitPathOutput then
-			puts "| gitPath | #{get2ndFieldName()} | added | removed |"
-			puts "| :--- | :--- | ---: | ---: |"
+			puts "| gitPath | duration | #{get2ndFieldName()} | added | removed |"
+			puts "| :--- | :--- | :--- | ---: | ---: |"
 		else
-			puts "| #{get2ndFieldName()} | added | removed |"
-			puts "| :--- | ---: | ---: |"
+			puts "| duration | #{get2ndFieldName()} | added | removed |"
+			puts "| :--- | :--- | ---: | ---: |"
 		end
 		@result.each do |gitPath, result|
-			result.each do |theResult|
-				filename = theResult[:key]
-				_result = theResult[:value]
-				if @enableGitPathOutput then
-					puts "| #{gitPath} | #{filename} | #{_result[:added]} | #{_result[:removed]} |"
-				else
-					puts "| #{filename} | #{_result[:added]} | #{_result[:removed]} |"
+			result.each do |duration, result2|
+				result2.each do |theResult|
+					filename = theResult[:key]
+					_result = theResult[:value]
+					if @enableGitPathOutput then
+						puts "| #{gitPath} | #{duration} | #{filename} | #{_result[:added]} | #{_result[:removed]} |"
+					else
+						puts "| #{duration} | #{filename} | #{_result[:added]} | #{_result[:removed]} |"
+					end
 				end
 			end
 		end
@@ -87,18 +94,19 @@ class ResultCollector
 	# synchronized
 	def dumpMarkdownPerGit
 		if @enableGitPathOutput then
-			puts "| gitPath | added | removed |"
-			puts "| :--- | ---: | ---: |"
+			puts "| gitPath | duration | added | removed |"
+			puts "| :--- | ---: | ---: | ---: |"
 		else
-			puts "| added | removed ||"
-			puts "| ---: | ---: |"
+			puts "| duration | added | removed ||"
+			puts "| ---: | ---: | ---: |"
 		end
-		@result.each do |gitPath, _result|
-			result = _result[:value]
-			if @enableGitPathOutput then
-				puts "| #{gitPath} | #{result[:added]} | #{result[:removed]} |"
-			else
-				puts "| #{result[:added]} | #{result[:removed]} |"
+		@result.each do |gitPath, result2|
+			result2.each do |duration, result|
+				if @enableGitPathOutput then
+					puts "| #{gitPath} | #{duration} | #{result[:added]} | #{result[:removed]} |"
+				else
+					puts "| #{duration} | #{result[:added]} | #{result[:removed]} |"
+				end
 			end
 		end
 	end
@@ -110,11 +118,15 @@ class ResultCollector
 			if @enableGitPathOutput then
 				puts "  \"#{gitPath}\" : {"
 			end
-			result.each do |theResult|
-				filename = theResult[:key]
-				_result = theResult[:value]
-				puts "    \"#{filename}\" : { \"added\":#{_result[:added]}, \"removed\":#{_result[:removed]} },"
+			result.each do |duration, result2|
+				puts "    \"#{duration}\" : {"
+				result2.each do |theResult|
+					filename = theResult[:key]
+					_result = theResult[:value]
+					puts "      \"#{filename}\" : { \"added\":#{_result[:added]}, \"removed\":#{_result[:removed]} },"
+				end
 			end
+			puts "    }"
 			if @enableGitPathOutput then
 				puts "  }"
 			end
@@ -125,13 +137,13 @@ class ResultCollector
 	# synchronized
 	def dumpJsonPerGit
 		puts "["
-		@result.each do |gitPath, theResult|
-			result = theResult[:value]
-
-			if @enableGitPathOutput then
-				puts "  \"#{gitPath}\" : {\"added\":#{result[:added]}, \"removed\":#{result[:removed]} },"
-			else
-				puts "  {\"added\":#{result[:added]}, \"removed\":#{result[:removed]} },"
+		@result.each do |gitPath, result2|
+			result2.each do |duration, result|
+				if @enableGitPathOutput then
+					puts "  \"#{gitPath}\" : { \"duration\":#{duration}, \"added\":#{result[:added]}, \"removed\":#{result[:removed]} },"
+				else
+					puts "  { \"duration\":#{duration}, \"added\":#{result[:added]}, \"removed\":#{result[:removed]} },"
+				end
 			end
 		end
 		puts "]"
@@ -139,14 +151,16 @@ class ResultCollector
 
 	# synchronized
 	def dumpCsv
-		@result.each do |gitPath, result|
-			result.each do |theResult|
-				filename = theResult[:key]
-				_result = theResult[:value]
-				if @enableGitPathOutput then
-					puts "\"#{gitPath}\", \"#{filename}\", #{_result[:added]}, #{_result[:removed]}"
-				else
-					puts "\"#{filename}\", #{_result[:added]}, #{_result[:removed]}"
+		@result.each do |gitPath, result2|
+			result2.each do |duration, result|
+				result.each do |theResult|
+					filename = theResult[:key]
+					_result = theResult[:value]
+					if @enableGitPathOutput then
+						puts "\"#{gitPath}\", \"#{duration}\", \"#{filename}\", #{_result[:added]}, #{_result[:removed]}"
+					else
+						puts "\"#{duration}\", #{filename}\", #{_result[:added]}, #{_result[:removed]}"
+					end
 				end
 			end
 		end
@@ -154,12 +168,13 @@ class ResultCollector
 
 	# synchronized
 	def dumpCsvPerGit
-		@result.each do |gitPath, _result|
-			result = _result[:value]
-			if @enableGitPathOutput then
-				puts "\"#{gitPath}\", #{result[:added]}, #{result[:removed]}"
-			else
-				puts "#{result[:added]}, #{result[:removed]}"
+		@result.each do |gitPath, result2|
+			result2.each do |duration, result|
+				if @enableGitPathOutput then
+					puts "\"#{gitPath}\", \"#{duration}\", #{result[:added]}, #{result[:removed]}"
+				else
+					puts "\"#{duration}\", #{result[:added]}, #{result[:removed]}"
+				end
 			end
 		end
 	end
@@ -167,16 +182,23 @@ class ResultCollector
 	# synchronized
 	def collectPerGit
 		result = {}
-		@result.each do |gitPath, aResult|
-			added = 0
-			removed = 0
-			aResult.each do | theResult |
-				filename = theResult[:key]
-				_result = theResult[:value]
-				added = added + _result[:added]
-				removed = removed + _result[:removed]
+		@result.each do |gitPath, result2|
+			result2.each do |duration, aResult|
+				added = 0
+				removed = 0
+				aResult.each do | theResult |
+					filename = theResult[:key]
+					_result = theResult[:value]
+					added = added + _result[:added]
+					removed = removed + _result[:removed]
+				end
+				tmp = {}
+				if result.has_key?(gitPath) then
+					tmp = result[gitPath]
+				end
+				tmp[duration] = {:added=>added, :removed=>removed}
+				result[gitPath] = tmp
 			end
-			result[gitPath] = {:added=>added, :removed=>removed}
 		end
 		@result = result
 	end
@@ -184,15 +206,24 @@ class ResultCollector
 	# synchronized
 	def sortResult
 		result = {}
-		@result.each do |gitPath, aResult|
-			theResult = HashUtil.toArrayFromHash( aResult )			
-			case @sort
-			when "straight"
-				theResult.sort!{|b, a| (a[:value][:added]+a[:value][:removed]) <=> (b[:value][:added]+b[:value][:removed]) }
-			when "reverse"
-				theResult.sort!{|a, b| (a[:value][:added]+a[:value][:removed]) <=> (b[:value][:added]+b[:value][:removed]) }
+		@result.each do |gitPath, result2|
+			result2.each do |duration, aResult|
+				theResult = HashUtil.toArrayFromHash( aResult )			
+				case @sort
+				when "straight"
+					theResult.sort!{|b, a| (a[:value][:added]+a[:value][:removed]) <=> (b[:value][:added]+b[:value][:removed]) }
+				when "reverse"
+					theResult.sort!{|a, b| (a[:value][:added]+a[:value][:removed]) <=> (b[:value][:added]+b[:value][:removed]) }
+				end
+				tmp = {}
+				if result.has_key?( gitPath ) then
+					tmp = result[ gitPath ]
+				end
+				tmp[duration] = theResult
+				tmp = tmp.sort.to_h
+
+				result[gitPath] = tmp
 			end
-			result[gitPath] = theResult
 		end
 		@result = result
 	end
@@ -221,10 +252,11 @@ end
 class ExecGitLogStat < TaskAsync
 	COMMIT_SEPARATOR = "#####"
 
-	def initialize(gitPath, resultCollector, gitOptions, options)
+	def initialize(gitPath, resultCollector, duration, gitOptions, options)
 		super("ExecGitLogStat::#{gitPath}")
 		@gitPath = gitPath
 		@resultCollector = resultCollector
+		@duration = duration
 		@gitOptions = gitOptions
 		@options = options
 	end
@@ -243,7 +275,7 @@ class ExecGitLogStat < TaskAsync
 			puts "\n#{@gitPath} is not existed)" if @options[:verbose]
 		end
 
-		@resultCollector.onResult(@gitPath, result) if !result.empty?
+		@resultCollector.onResult(@gitPath, @duration, result) if !result.empty?
 		_doneTask()
 	end
 end
@@ -290,6 +322,7 @@ options = {
 	:enableGitPathOutput => true,
 	:mode => "file",
 	:duration => "full",
+	:calcUnit => "full",
 	:sort => "none",
 	:author => nil,
 	:numOfThreads => TaskManagerAsync.getNumberOfProcessor(),
@@ -306,6 +339,10 @@ opt_parser = OptionParser.new do |opts|
 
 	opts.on("-d", "--duration=", "Specify analyzing duration: full, day, month(=last 1 month), year, e.g. from:2021-04-01 (default:#{options[:duration]})") do |duration|
 		options[:duration] = duration
+	end
+
+	opts.on("-u", "--calcUnit=", "Specify analyzing unit: full, per-day, per-month, per-year (default:#{options[:calcUnit]})") do |calcUnit|
+		options[:calcUnit] = calcUnit
 	end
 
 	opts.on("-o", "--gitOpt=", "Specify git options --gitOpt='--oneline', etc.") do |gitOptions|
@@ -350,10 +387,60 @@ gitPaths.push(".") if gitPaths.empty?
 
 
 options[:gitOptions] = GitOptionUtil.filterAuthor(options[:gitOptions], options[:author])
-options[:gitOptions] = GitOptionUtil.filterDuration(options[:gitOptions], options[:duration])
+if options[:calcUnit] == "full" then
+	options[:gitOptions] = GitOptionUtil.filterDuration(options[:gitOptions], options[:duration])
 
-gitPaths.each do |aPath|
-	taskMan.addTask( ExecGitLogStat.new( aPath, resultCollector, options[:gitOptions], options ) )
+	gitPaths.each do |aPath|
+		taskMan.addTask( ExecGitLogStat.new( aPath, resultCollector, options[:calcUnit], options[:gitOptions], options ) )
+	end
+else
+	fromTime = 0
+	calcUnit = ""
+
+	case options[:calcUnit]
+	when "per-day"
+		calcUnit = "day ago"
+		case options[:duration]
+		when "day"
+			fromTime = 1
+		when "month"
+			fromTime = 31
+		when "year"
+			fromTime = 365
+		else
+			#TODO: convert "from:xxxx-xx-xx" to fromTime
+			fromTime = 365
+		end
+	when "per-month"
+		calcUnit = "month ago"
+		case options[:duration]
+		when "day", "month"
+			fromTime = 1
+		when "year"
+			fromTime = 12
+		else
+			#TODO: convert "from:xxxx-xx-xx" to fromTime
+			fromTime = 12
+		end
+	when "per-year"
+		calcUnit = "year ago"
+		case options[:duration]
+		when "day", "month", "year"
+			fromTime = 1
+		else
+			#TODO: convert "from:xxxx-xx-xx" to fromTime
+			fromTime = 1
+		end
+	else
+	end
+
+	(1..fromTime).each do |i|
+		options[:gitOptions] = "#{options[:gitOptions]} --after=\"#{i} #{calcUnit}\" --before=\"#{i-1} #{calcUnit}\""
+
+		gitPaths.each do |aPath|
+			taskMan.addTask( ExecGitLogStat.new( aPath, resultCollector, i, options[:gitOptions], options ) )
+		end
+	end
 end
 
 taskMan.executeAll()
