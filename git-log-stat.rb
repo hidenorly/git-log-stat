@@ -15,6 +15,7 @@
 # limitations under the License.
 
 require 'optparse'
+require 'date'
 require "./TaskManager"
 require "./FileUtil"
 require "./StrUtil"
@@ -289,6 +290,33 @@ class GitOptionUtil
 		return gitOptions
 	end
 
+	def self.getDateStringFromDurationOption(duration)
+		result = ""
+		if duration.start_with?("from:") then
+			pos = duration.index(":")
+			result = duration.slice( pos + 1, duration.length - pos - 1 )
+		end
+		return result
+	end
+
+	def self.getDaysFromDuration(duration)
+		result = 1
+		case duration
+		when "day"
+			result = 1
+		when "month"
+			result = 31
+		when "year"
+			result = 365
+		else
+			tmp = getDateStringFromDurationOption(duration)
+			fromDate = Date.parse(tmp)
+			todayDate = Date.today()
+			result = todayDate - fromDate
+		end
+		return result.to_i
+	end
+
 	def self.filterDuration(gitOptions, duration)
 		if duration then
 			case duration
@@ -299,12 +327,9 @@ class GitOptionUtil
 			when "year"
 				gitOptions = gitOptions + " --after=\"1 year ago\""
 			else
-				if duration.start_with?("from:") then
-					pos = duration.index(":")
-					fromDate = duration.slice( pos + 1, duration.length - pos - 1 )
-					if !fromDate.empty? then
-						gitOptions = gitOptions + " --after=#{fromDate}"
-					end
+				fromDate = getDateStringFromDurationOption(duration)
+				if !fromDate.empty? then
+					gitOptions = gitOptions + " --after=#{fromDate}"
 				end
 			end
 		end
@@ -394,47 +419,23 @@ if options[:calcUnit] == "full" then
 		taskMan.addTask( ExecGitLogStat.new( aPath, resultCollector, options[:calcUnit], options[:gitOptions], options ) )
 	end
 else
-	fromTime = 0
+	fromDate = GitOptionUtil.getDaysFromDuration( options[:duration] )
 	calcUnit = ""
 
 	case options[:calcUnit]
 	when "per-day"
 		calcUnit = "day ago"
-		case options[:duration]
-		when "day"
-			fromTime = 1
-		when "month"
-			fromTime = 31
-		when "year"
-			fromTime = 365
-		else
-			#TODO: convert "from:xxxx-xx-xx" to fromTime
-			fromTime = 365
-		end
+		#fromDate is already "day" based
 	when "per-month"
 		calcUnit = "month ago"
-		case options[:duration]
-		when "day", "month"
-			fromTime = 1
-		when "year"
-			fromTime = 12
-		else
-			#TODO: convert "from:xxxx-xx-xx" to fromTime
-			fromTime = 12
-		end
+		fromDate = ( (fromDate / 31) + 0.999).to_i
 	when "per-year"
 		calcUnit = "year ago"
-		case options[:duration]
-		when "day", "month", "year"
-			fromTime = 1
-		else
-			#TODO: convert "from:xxxx-xx-xx" to fromTime
-			fromTime = 1
-		end
+		fromDate = ( (fromDate / 365) + 0.999).to_i
 	else
 	end
 
-	(1..fromTime).each do |i|
+	(1..fromDate).each do |i|
 		options[:gitOptions] = "#{options[:gitOptions]} --after=\"#{i} #{calcUnit}\" --before=\"#{i-1} #{calcUnit}\""
 
 		gitPaths.each do |aPath|
