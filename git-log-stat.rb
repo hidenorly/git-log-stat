@@ -43,11 +43,12 @@ end
 
 
 class ResultCollector
-	def initialize( mode, sort, outputFormat, enableGitPathOutput )
+	def initialize( mode, sort, sortKey, outputFormat, enableGitPathOutput )
 		@result = {}
 		@_mutex = Mutex.new
 		@mode = mode
 		@sort = sort
+		@sortKey = sortKey
 		@outputFormat = outputFormat
 		@enableGitPathOutput = enableGitPathOutput
 	end
@@ -79,9 +80,7 @@ class ResultCollector
 		end
 		@result.each do |gitPath, result|
 			result.each do |duration, result2|
-				result2.each do |theResult|
-					filename = theResult[:key]
-					_result = theResult[:value]
+				result2.each do |filename, _result|
 					if @enableGitPathOutput then
 						puts "| #{gitPath} | #{duration} | #{filename} | #{_result[:added]} | #{_result[:removed]} |"
 					else
@@ -121,9 +120,7 @@ class ResultCollector
 			end
 			result.each do |duration, result2|
 				puts "    \"#{duration}\" : {"
-				result2.each do |theResult|
-					filename = theResult[:key]
-					_result = theResult[:value]
+				result2.each do |filename, _result|
 					puts "      \"#{filename}\" : { \"added\":#{_result[:added]}, \"removed\":#{_result[:removed]} },"
 				end
 			end
@@ -154,9 +151,7 @@ class ResultCollector
 	def dumpCsv
 		@result.each do |gitPath, result2|
 			result2.each do |duration, result|
-				result.each do |theResult|
-					filename = theResult[:key]
-					_result = theResult[:value]
+				result.each do |filename, _result|
 					if @enableGitPathOutput then
 						puts "\"#{gitPath}\", \"#{duration}\", \"#{filename}\", #{_result[:added]}, #{_result[:removed]}"
 					else
@@ -187,9 +182,7 @@ class ResultCollector
 			result2.each do |duration, aResult|
 				added = 0
 				removed = 0
-				aResult.each do | theResult |
-					filename = theResult[:key]
-					_result = theResult[:value]
+				aResult.each do | filename, _result |
 					added = added + _result[:added]
 					removed = removed + _result[:removed]
 				end
@@ -204,27 +197,45 @@ class ResultCollector
 		@result = result
 	end
 
+	def self._calcAllOfAddedRemoved(a)
+		result = 0
+		a.each do |filename, value|
+			result = result + value[:added] + value[:removed]
+		end
+		return result
+	end
+
 	# synchronized
 	def sortResult
 		result = {}
 		@result.each do |gitPath, result2|
 			result2.each do |duration, aResult|
-				theResult = HashUtil.toArrayFromHash( aResult )			
 				case @sort
 				when "straight"
-					theResult.sort!{|b, a| (a[:value][:added]+a[:value][:removed]) <=> (b[:value][:added]+b[:value][:removed]) }
+					aResult = aResult.sort{|(bKey,b), (aKey,a)| (a[:added]+a[:removed]) <=> (b[:added]+b[:removed]) }
 				when "reverse"
-					theResult.sort!{|a, b| (a[:value][:added]+a[:value][:removed]) <=> (b[:value][:added]+b[:value][:removed]) }
+					aResult = aResult.sort{|(aKey,a), (bKey,b)| (a[:added]+a[:removed]) <=> (b[:added]+b[:removed]) }
 				end
 				tmp = {}
 				if result.has_key?( gitPath ) then
 					tmp = result[ gitPath ]
 				end
-				tmp[duration] = theResult
-				tmp = tmp.sort.to_h
-
+				tmp[duration] = aResult
 				result[gitPath] = tmp
 			end
+
+			tmp = result[gitPath]
+			if @sortKey == "largestUnit" then
+				case @sort
+				when "straight"
+					tmp = tmp.sort{|(bKey, b), (aKey, a)|( ResultCollector._calcAllOfAddedRemoved(a) <=> ResultCollector._calcAllOfAddedRemoved(b) )}
+				when "reverse"
+					tmp = tmp.sort{|(aKey, a), (bKey, b)|( ResultCollector._calcAllOfAddedRemoved(a) <=> ResultCollector._calcAllOfAddedRemoved(b) )}
+				end
+			else
+				tmp = tmp.sort
+			end
+			result[gitPath] = tmp
 		end
 		@result = result
 	end
@@ -349,6 +360,7 @@ options = {
 	:duration => "full",
 	:calcUnit => "full",
 	:sort => "none",
+	:sortKey => "largestFile",
 	:author => nil,
 	:numOfThreads => TaskManagerAsync.getNumberOfProcessor(),
 }
@@ -388,6 +400,10 @@ opt_parser = OptionParser.new do |opts|
 		options[:sort] = sort
 	end
 
+	opts.on("-k", "--sortKey=", "Specify sort key: largestUnit, largestFile (default:#{options[:sortKey]})") do |sortKey|
+		options[:sortKey] = sortKey
+	end
+
 	opts.on("", "--disableGitPathOutput", "Specify if you don't want to output gitPath as 1st col.") do |disableGitPathOutput|
 		options[:enableGitPathOutput] = false
 	end
@@ -405,7 +421,7 @@ end.parse!
 # common
 taskMan = TaskManagerAsync.new( options[:numOfThreads].to_i )
 
-resultCollector = ResultCollector.new( options[:mode], options[:sort], options[:outputFormat], options[:enableGitPathOutput] )
+resultCollector = ResultCollector.new( options[:mode], options[:sort], options[:sortKey], options[:outputFormat], options[:enableGitPathOutput] )
 
 gitPaths = ARGV.clone()
 gitPaths.push(".") if gitPaths.empty?
