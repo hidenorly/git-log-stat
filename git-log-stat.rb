@@ -43,7 +43,7 @@ end
 
 
 class ResultCollector
-	def initialize( mode, sort, sortKey, outputFormat, enableGitPathOutput )
+	def initialize( mode, sort, sortKey, outputFormat, enableGitPathOutput, enableDurationOutput )
 		@result = {}
 		@_mutex = Mutex.new
 		@mode = mode
@@ -51,6 +51,7 @@ class ResultCollector
 		@sortKey = sortKey
 		@outputFormat = outputFormat
 		@enableGitPathOutput = enableGitPathOutput
+		@enableDurationOutput = enableDurationOutput
 	end
 
 	def onResult( gitPath, duration, result )
@@ -69,23 +70,33 @@ class ResultCollector
 		return "filename"
 	end
 
+	def getMarkdownFieldNameFormat()
+		fieldName = ""
+		fieldFormat = ""
+		if @enableGitPathOutput then
+			fieldName = "| gitPath #{fieldName}"
+			fieldFormat = "| :--- #{fieldFormat}"
+		end
+		if @enableDurationOutput then
+			fieldName = "#{fieldName} | duration"
+			fieldFormat = "#{fieldFormat} | :--- "
+		end
+
+		return fieldName, fieldFormat
+	end
+
 	# synchronized
 	def dumpMarkdown
-		if @enableGitPathOutput then
-			puts "| gitPath | duration | #{get2ndFieldName()} | added | removed |"
-			puts "| :--- | :--- | :--- | ---: | ---: |"
-		else
-			puts "| duration | #{get2ndFieldName()} | added | removed |"
-			puts "| :--- | :--- | ---: | ---: |"
-		end
+		fieldName, fieldFormat = getMarkdownFieldNameFormat()
+		puts "#{fieldName}| #{get2ndFieldName()} | added | removed |"
+		puts "#{fieldFormat}| :--- | ---: | ---: |"
+
 		@result.each do |gitPath, result|
 			result.each do |duration, result2|
 				result2.each do |filename, _result|
-					if @enableGitPathOutput then
-						puts "| #{gitPath} | #{duration} | #{filename} | #{_result[:added]} | #{_result[:removed]} |"
-					else
-						puts "| #{duration} | #{filename} | #{_result[:added]} | #{_result[:removed]} |"
-					end
+					print("| #{gitPath} ") if @enableGitPathOutput
+					print("| #{duration} ") if @enableDurationOutput
+					print "| #{filename} | #{_result[:added]} | #{_result[:removed]} |\n"
 				end
 			end
 		end
@@ -93,20 +104,14 @@ class ResultCollector
 
 	# synchronized
 	def dumpMarkdownPerGit
-		if @enableGitPathOutput then
-			puts "| gitPath | duration | added | removed |"
-			puts "| :--- | ---: | ---: | ---: |"
-		else
-			puts "| duration | added | removed ||"
-			puts "| ---: | ---: | ---: |"
-		end
+		fieldName, fieldFormat = getMarkdownFieldNameFormat()
+		puts "#{fieldName}| added | removed |"
+		puts "#{fieldFormat}| ---: | ---: |"
 		@result.each do |gitPath, result2|
-			result2.each do |duration, result|
-				if @enableGitPathOutput then
-					puts "| #{gitPath} | #{duration} | #{result[:added]} | #{result[:removed]} |"
-				else
-					puts "| #{duration} | #{result[:added]} | #{result[:removed]} |"
-				end
+			result2.each do |duration, _result|
+				print("| #{gitPath} ") if @enableGitPathOutput
+				print("| #{duration} ") if @enableDurationOutput
+				print "| #{_result[:added]} | #{_result[:removed]} |\n"
 			end
 		end
 	end
@@ -119,15 +124,13 @@ class ResultCollector
 				puts "  \"#{gitPath}\" : {"
 			end
 			result.each do |duration, result2|
-				puts "    \"#{duration}\" : {"
+				puts "    \"#{duration}\" : {" if @enableDurationOutput
 				result2.each do |filename, _result|
 					puts "      \"#{filename}\" : { \"added\":#{_result[:added]}, \"removed\":#{_result[:removed]} },"
 				end
 			end
-			puts "    }"
-			if @enableGitPathOutput then
-				puts "  }"
-			end
+			puts "    }" if @enableDurationOutput
+			puts "  }" if @enableGitPathOutput
 		end
 		puts "}"
 	end
@@ -137,10 +140,11 @@ class ResultCollector
 		puts "["
 		@result.each do |gitPath, result2|
 			result2.each do |duration, result|
-				if @enableGitPathOutput then
-					puts "  \"#{gitPath}\" : { \"duration\":#{duration}, \"added\":#{result[:added]}, \"removed\":#{result[:removed]} },"
+				print("  \"#{gitPath}\" : { ") if @enableGitPathOutput
+				if @enableDurationOutput
+					print("\"duration\":#{duration}, \"added\":#{result[:added]}, \"removed\":#{result[:removed]} },\n")
 				else
-					puts "  { \"duration\":#{duration}, \"added\":#{result[:added]}, \"removed\":#{result[:removed]} },"
+					print("\"added\":#{result[:added]}, \"removed\":#{result[:removed]} },\n")
 				end
 			end
 		end
@@ -152,11 +156,9 @@ class ResultCollector
 		@result.each do |gitPath, result2|
 			result2.each do |duration, result|
 				result.each do |filename, _result|
-					if @enableGitPathOutput then
-						puts "\"#{gitPath}\", \"#{duration}\", \"#{filename}\", #{_result[:added]}, #{_result[:removed]}"
-					else
-						puts "\"#{duration}\", #{filename}\", #{_result[:added]}, #{_result[:removed]}"
-					end
+					print("\"#{gitPath}\", ") if @enableGitPathOutput
+					print("\"#{duration}\", ") if @enableDurationOutput
+					print("\"#{filename}\", #{_result[:added]}, #{_result[:removed]}\n")
 				end
 			end
 		end
@@ -166,11 +168,9 @@ class ResultCollector
 	def dumpCsvPerGit
 		@result.each do |gitPath, result2|
 			result2.each do |duration, result|
-				if @enableGitPathOutput then
-					puts "\"#{gitPath}\", \"#{duration}\", #{result[:added]}, #{result[:removed]}"
-				else
-					puts "\"#{duration}\", #{result[:added]}, #{result[:removed]}"
-				end
+				print("\"#{gitPath}\", ") if @enableGitPathOutput
+				print("\"#{duration}\", ") if @enableDurationOutput
+				print("#{result[:added]}, #{result[:removed]}\n")
 			end
 		end
 	end
@@ -319,11 +319,15 @@ class GitOptionUtil
 			result = 31
 		when "year"
 			result = 365
+		when "full"
+			result = 365*5 #TODO: Fix this. this is tentative
 		else
 			tmp = getDateStringFromDurationOption(duration)
-			fromDate = Date.parse(tmp)
-			todayDate = Date.today()
-			result = todayDate - fromDate
+			if !tmp.empty? then
+				fromDate = Date.parse(tmp)
+				todayDate = Date.today()
+				result = todayDate - fromDate
+			end
 		end
 		return result.to_i
 	end
@@ -421,7 +425,7 @@ end.parse!
 # common
 taskMan = TaskManagerAsync.new( options[:numOfThreads].to_i )
 
-resultCollector = ResultCollector.new( options[:mode], options[:sort], options[:sortKey], options[:outputFormat], options[:enableGitPathOutput] )
+resultCollector = ResultCollector.new( options[:mode], options[:sort], options[:sortKey], options[:outputFormat], options[:enableGitPathOutput], (options[:duration] != "full" || options[:calcUnit]!="full") )
 
 gitPaths = ARGV.clone()
 gitPaths.push(".") if gitPaths.empty?
@@ -445,7 +449,7 @@ else
 	when "per-month"
 		calcUnit = "month ago"
 		fromDate = ( (fromDate / 31) + 0.999).to_i
-	when "per-year"
+	when "per-year", "full"
 		calcUnit = "year ago"
 		fromDate = ( (fromDate / 365) + 0.999).to_i
 	else
