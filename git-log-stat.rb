@@ -205,11 +205,20 @@ class ResultCollector
 		return result
 	end
 
+	def self._calcAllOfAddedRemovedOverDurations(a)
+		result = 0
+		a.each do |duration, aResult|
+			result = result + _calcAllOfAddedRemoved(aResult)
+		end
+		return result
+	end
+
 	# synchronized
 	def sortResult
 		result = {}
 		@result.each do |gitPath, result2|
 			result2.each do |duration, aResult|
+				# sort files
 				case @sort
 				when "straight"
 					aResult = aResult.sort{|(bKey,b), (aKey,a)| (a[:added]+a[:removed]) <=> (b[:added]+b[:removed]) }
@@ -224,8 +233,10 @@ class ResultCollector
 				result[gitPath] = tmp
 			end
 
+			# sort durations
 			tmp = result[gitPath]
-			if @sortKey == "largestUnit" then
+			case @sortKey
+			when "largestUnit"
 				case @sort
 				when "straight"
 					tmp = tmp.sort{|(bKey, b), (aKey, a)|( ResultCollector._calcAllOfAddedRemoved(a) <=> ResultCollector._calcAllOfAddedRemoved(b) )}
@@ -236,6 +247,16 @@ class ResultCollector
 				tmp = tmp.sort
 			end
 			result[gitPath] = tmp
+		end
+
+		# sort gitPath(s)
+		if @sortKey == "largestGit" then
+			case @sort
+			when "straight"
+				result = result.sort{|(bKey, b), (aKey, a)|( ResultCollector._calcAllOfAddedRemovedOverDurations(a) <=> ResultCollector._calcAllOfAddedRemovedOverDurations(b) )}
+			when "reverse"
+				result = result.sort{|(aKey, a), (bKey, b)|( ResultCollector._calcAllOfAddedRemovedOverDurations(a) <=> ResultCollector._calcAllOfAddedRemovedOverDurations(b) )}
+			end
 		end
 		@result = result
 	end
@@ -404,7 +425,7 @@ opt_parser = OptionParser.new do |opts|
 		options[:sort] = sort
 	end
 
-	opts.on("-k", "--sortKey=", "Specify sort key: largestUnit, largestFile (default:#{options[:sortKey]})") do |sortKey|
+	opts.on("-k", "--sortKey=", "Specify sort key: largestUnit, largestFile, largestGit (default:#{options[:sortKey]})") do |sortKey|
 		options[:sortKey] = sortKey
 	end
 
