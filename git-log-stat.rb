@@ -16,6 +16,7 @@
 
 require 'optparse'
 require 'date'
+require 'rexml/document'
 require "./TaskManager"
 require "./FileUtil"
 require "./StrUtil"
@@ -373,7 +374,31 @@ class GitOptionUtil
 	end
 end
 
+class RepoUtil
+	DEF_REPOPATH = "/.repo"
+	DEF_MANIFESTPATH = "#{DEF_REPOPATH}/manifests"
+	DEF_MANIFESTFILE = "default.xml"
+	DEF_MANIFESTFILE2 = "manifest.xml"
 
+	def self.getGitPathesFromManifest(basePath, manifestFile=DEF_MANIFESTFILE2)
+		pathes = []
+		manifestPath = "#{basePath}#{DEF_MANIFESTPATH}/#{DEF_MANIFESTFILE}"
+		manifestPath = "#{basePath}#{DEF_MANIFESTPATH}/#{DEF_MANIFESTFILE2}" if !FileTest.exist?(manifestPath)
+		manifestPath = "#{basePath}#{DEF_REPOPATH}/#{DEF_MANIFESTFILE}" if !FileTest.exist?(manifestPath)
+		manifestPath = "#{basePath}#{DEF_REPOPATH}/#{DEF_MANIFESTFILE2}" if !FileTest.exist?(manifestPath)
+
+		if FileTest.exist?(manifestPath) then
+			doc = REXML::Document.new( open(manifestPath) )
+
+			doc.elements.each("manifest/project[@name]") do |anElement|
+				aPath = anElement.attributes["path"] ? anElement.attributes["path"] : anElement.attributes["name"]
+				pathes << "#{basePath}/#{aPath}"
+			end
+		end
+
+		return pathes
+	end
+end
 
 #---- main --------------------------
 options = {
@@ -451,6 +476,16 @@ resultCollector = ResultCollector.new( options[:mode], options[:sort], options[:
 gitPaths = ARGV.clone()
 gitPaths.push(".") if gitPaths.empty?
 
+_gitPaths = []
+gitPaths.each do |aGitPath|
+	gitPathsInManifest = RepoUtil.getGitPathesFromManifest( aGitPath )
+	if !gitPathsInManifest.empty? then
+		_gitPaths.concat( gitPathsInManifest )
+	else
+		_gitPaths << aGitPath
+	end
+end
+gitPaths = _gitPaths
 
 options[:gitOptions] = GitOptionUtil.filterAuthor(options[:gitOptions], options[:author])
 if options[:calcUnit] == "full" then
