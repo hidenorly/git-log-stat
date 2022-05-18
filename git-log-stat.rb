@@ -118,6 +118,34 @@ class ResultCollector
 	end
 
 	# synchronized
+	def dumpMarkdownPerDuration
+		fieldName = ""
+		fieldFormat = ""
+		if @enableGitPathOutput then
+			fieldName = " | gitPath"
+			fieldFormat = " | :---"
+		end
+
+		puts "| duration#{fieldName} | added | removed |"
+		puts "| ---:#{fieldFormat} | ---: | ---: |"
+		@result.each do |duration, result2|
+			if @enableGitPathOutput
+				result2.each do |gitPath, _result|
+					puts "| #{duration} | #{gitPath} | #{_result[:added]} | #{_result[:removed]} |"
+				end
+			else
+				added = 0
+				removed = 0
+				result2.each do |gitPath, _result|
+					 added = added + _result[:added]
+					 removed = removed + _result[:removed]
+				end
+				puts "| #{duration} | #{added} | #{removed} |"
+			end
+		end
+	end
+
+	# synchronized
 	def dumpJson
 		puts "{"
 		@result.each do |gitPath, result|
@@ -153,6 +181,30 @@ class ResultCollector
 	end
 
 	# synchronized
+	def dumpJsonPerDuration
+		puts "["
+		@result.each do |duration, result2|
+			if @enableGitPathOutput
+				puts "  { \"#{duration}\" : {"
+				result2.each do |gitPath, _result|
+					puts "    \"#{gitPath}\" : { \"added\":#{_result[:added]}, \"removed\":#{_result[:removed]} },"
+				end
+				puts "  }},"
+			else
+				added = 0
+				removed = 0
+				result2.each do |gitPath, _result|
+					 added = added + _result[:added]
+					 removed = removed + _result[:removed]
+				end
+				puts "  {\"duration\":\"#{duration}\", \"added\":#{added}, \"removed\":#{removed} },"
+			end
+		end
+		puts "]"
+	end
+
+
+	# synchronized
 	def dumpCsv
 		@result.each do |gitPath, result2|
 			result2.each do |duration, result|
@@ -177,6 +229,25 @@ class ResultCollector
 	end
 
 	# synchronized
+	def dumpCsvPerDuration
+		@result.each do |duration, result2|
+			if @enableGitPathOutput
+				result2.each do |gitPath, _result|
+					puts "#{duration}, \"#{gitPath}\", #{_result[:added]}, #{_result[:removed]}"
+				end
+			else
+				added = 0
+				removed = 0
+				result2.each do |gitPath, _result|
+					 added = added + _result[:added]
+					 removed = removed + _result[:removed]
+				end
+				puts "#{duration}, #{added}, #{removed}"
+			end
+		end
+	end
+
+	# synchronized
 	def collectPerGit
 		result = {}
 		@result.each do |gitPath, result2|
@@ -195,6 +266,37 @@ class ResultCollector
 				result[gitPath] = tmp
 			end
 		end
+		@result = result
+	end
+
+	# synchronized
+	def collectPerDuration
+		result = {}
+
+		@result.each do |gitPath, result2|
+			result2.each do |duration, aResult|
+				tmp = {}
+				tmp = result[duration] if result.has_key?( duration )
+
+				added = 0
+				removed = 0
+				aResult.each do | filename, _result |
+					added = added + _result[:added]
+					removed = removed + _result[:removed]
+				end
+				tmp[gitPath] = {:added=>added, :removed=>removed}
+
+				result[duration] = tmp
+			end
+		end
+
+		case @sort
+		when "straight"
+			result = result.sort{|(bKey,b), (aKey,a)| (aKey.to_i <=> bKey.to_i) }
+		when "reverse"
+			result = result.sort{|(aKey,a), (bKey,b)| (aKey.to_i <=> bKey.to_i) }
+		end
+
 		@result = result
 	end
 
@@ -264,18 +366,23 @@ class ResultCollector
 
 	def report()
 		@_mutex.synchronize {
-			sortResult()
 			case @mode
 			when "file",  "author"
-				#@result is already per-file then no need to do additionally
+				sortResult()
 				dumpMarkdown() if @outputFormat == "markdown"
 				dumpCsv() if @outputFormat == "csv"
 				dumpJson() if @outputFormat == "json"
 			when "git"
+				sortResult()
 				collectPerGit()
 				dumpMarkdownPerGit() if @outputFormat == "markdown"
 				dumpCsvPerGit() if @outputFormat == "csv"
 				dumpJsonPerGit() if @outputFormat == "json"
+			when "duration"
+				collectPerDuration()
+				dumpMarkdownPerDuration() if @outputFormat == "markdown"
+				dumpCsvPerDuration() if @outputFormat == "csv"
+				dumpJsonPerDuration() if @outputFormat == "json"
 			end
 
 		}
@@ -409,7 +516,7 @@ options = {
 	:mode => "file",
 	:duration => "full",
 	:calcUnit => "full",
-	:sort => "none",
+	:sort => "straight",
 	:sortKey => "largestFile",
 	:author => nil,
 	:numOfThreads => TaskManagerAsync.getNumberOfProcessor(),
@@ -420,7 +527,7 @@ opt_parser = OptionParser.new do |opts|
 	cmds = ""
 	opts.banner = "Usage: #{cmds} gitDir1 gitDir2 ..."
 
-	opts.on("-m", "--mode=", "Specify analysis mode: file or git or author(default:#{options[:mode]})") do |mode|
+	opts.on("-m", "--mode=", "Specify analysis mode: file or git or author or duration (default:#{options[:mode]})") do |mode|
 		options[:mode] = mode
 	end
 
