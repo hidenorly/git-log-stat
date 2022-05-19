@@ -290,11 +290,21 @@ class ResultCollector
 			end
 		end
 
-		case @sort
-		when "straight"
-			result = result.sort{|(bKey,b), (aKey,a)| (aKey.to_i <=> bKey.to_i) }
-		when "reverse"
-			result = result.sort{|(aKey,a), (bKey,b)| (aKey.to_i <=> bKey.to_i) }
+		case @sortKey
+		when "largestUnit"
+			case @sort
+			when "straight"
+				result = result.sort{|(bKey,b), (aKey,a)| (ResultCollector._calcAllOfAddedRemoved(a) <=> ResultCollector._calcAllOfAddedRemoved(b)) }
+			when "reverse"
+				result = result.sort{|(aKey,a), (bKey,b)| (ResultCollector._calcAllOfAddedRemoved(a) <=> ResultCollector._calcAllOfAddedRemoved(b)) }
+			end
+		else
+			case @sort
+			when "straight"
+				result = result.sort{|(bKey,b), (aKey,a)| (aKey.to_i <=> bKey.to_i) }
+			when "reverse"
+				result = result.sort{|(aKey,a), (bKey,b)| (aKey.to_i <=> bKey.to_i) }
+			end
 		end
 
 		@result = result
