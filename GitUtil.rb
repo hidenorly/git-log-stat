@@ -207,4 +207,9 @@ class GitUtil
 
 		return ExecUtil.getExecResultEachLine(exec_cmd, gitPath)
 	end
+
+	def self.isGitPath(gitPath)
+		result = Dir.exist?("#{gitPath}/.git")
+		return result
+	end
 end

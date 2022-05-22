@@ -529,6 +529,7 @@ options = {
 	:sort => "straight",
 	:sortKey => "largestFile",
 	:author => nil,
+	:recursive => false,
 	:numOfThreads => TaskManagerAsync.getNumberOfProcessor(),
 }
 
@@ -579,6 +580,10 @@ opt_parser = OptionParser.new do |opts|
 		options[:numOfThreads] = numOfThreads
 	end
 
+	opts.on("-r", "--recursive", "Specify recursive enumeration level (default:#{options[:recursive]})") do
+		options[:recursive] = true
+	end
+
 	opts.on("-v", "--verbose", "Enable verbose status output (default:#{options[:verbose]})") do
 		options[:verbose] = true
 	end
@@ -603,6 +608,20 @@ gitPaths.each do |aGitPath|
 	end
 end
 gitPaths = _gitPaths
+
+if options[:recursive] then
+	_gitPath = []
+	gitPaths.each do |aPath|
+		paths = []
+		FileUtil.iteratePath(aPath, "", paths, true, true)
+		paths.each do |aCandidatePath|
+			if GitUtil.isGitPath( aCandidatePath ) then
+				_gitPath << aCandidatePath
+			end
+		end
+	end
+	gitPaths = _gitPath if !_gitPath.empty?
+end
 
 options[:gitOptions] = GitOptionUtil.filterAuthor(options[:gitOptions], options[:author])
 if options[:calcUnit] == "full" then
