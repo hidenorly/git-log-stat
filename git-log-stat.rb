@@ -1,6 +1,6 @@
 #!/usr/bin/ruby
 
-# Copyright 2022 hidenory
+# Copyright 2022, 2023 hidenory
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,11 +17,11 @@
 require 'optparse'
 require 'date'
 require 'rexml/document'
-require "./TaskManager"
-require "./FileUtil"
-require "./StrUtil"
-require "./ExecUtil"
-require "./GitUtil"
+require_relative "TaskManager"
+require_relative "FileUtil"
+require_relative "StrUtil"
+require_relative "ExecUtil"
+require_relative "GitUtil"
 
 
 class HashUtil

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-require "./ExecUtil"
+require_relative "ExecUtil"
 require 'shellwords'
 
 class GitUtil
@@ -85,16 +85,33 @@ class GitUtil
 		exec_cmd += " 2>/dev/null"
 
 		result = ExecUtil.getExecResultEachLine(exec_cmd, gitPath)
-		return _ensureSha1(result.to_s)
+		return ensureShas(result.to_s)
 	end
 
-	def self.getTailCommitId(gitPath)
+	def self._getTailCommits(gitPath, count = 1)
 		result = nil
-		exec_cmd = "git rev-list HEAD | tail -n 1"
+		exec_cmd = "git rev-list HEAD | tail -n #{count}"
 		exec_cmd += " 2>/dev/null"
 
 		result = ExecUtil.getExecResultEachLine(exec_cmd, gitPath)
-		return _ensureSha1(result.to_s)
+		return ensureShas(result)
+	end
+
+	def self.getTailCommitId(gitPath)
+		return _getTailCommits( gitPath, 1 ).to_s
+	end
+
+	def self.getActualTailCommitId(gitPath)
+		result = nil
+		candidate = _getTailCommits( gitPath, 2 )
+		candidate.reverse_each do | aCommitId |
+			numStatResult = getLogNumStatBySha1( gitPath, aCommitId )
+			if !numStatResult.empty? then
+				result = aCommitId
+				break
+			end
+		end
+		return result
 	end
 
 	def self._parseNumStatOneLine(aLine, separator="#####")
@@ -198,6 +215,13 @@ class GitUtil
 		end
 
 		return result
+	end
+
+	def self.getLogNumStatBySha1(gitPath, commitId)
+		exec_cmd = "git log --numstat --pretty=\"\" #{commitId}"
+		exec_cmd += " 2>/dev/null"
+
+		return ExecUtil.getExecResultEachLine(exec_cmd, gitPath)
 	end
 
 	def self.getLogNumStat(gitPath, separator="#####", gitOptions=nil)
