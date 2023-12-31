@@ -18,12 +18,11 @@ require 'optparse'
 require 'date'
 require_relative "ExecUtil"
 
-
-def getAddedRemovedOverGits(targetPath, fromYear, author)
+def getAddedRemovedOverGits(targetPath, from, deltaMonth, author = nil)
 	added = 0
 	removed = 0
 	author = author ? "-a #{author}" : ""
-	exec_cmd = "ruby #{File.dirname(File.expand_path(__FILE__))}/git-log-stat.rb -r -m git --duration=\"from:#{fromYear}-01-01\" --gitOpt=\"--before=#{fromYear+1}-01-01\" #{author}"
+	exec_cmd = "ruby #{File.dirname(File.expand_path(__FILE__))}/git-log-stat.rb -r -m git --duration=\"from:#{from.strftime("%Y-%m-%d")}\" --gitOpt=\"--before=#{(from >> deltaMonth).strftime("%Y-%m-%d")}\" #{author}"
 	result = ExecUtil.getExecResultEachLine(exec_cmd, targetPath)
 	result.each do |aLine|
 		data = aLine.split(",")
@@ -42,8 +41,9 @@ options = {
 	:gitOptions	=> "",
 	:outputFormat => "csv",
 	:author => nil,
-	:fromYear => nil,
-	:endYear => nil,
+	:colllectionUnit => "year",
+	:from => nil,
+	:end => nil,
 }
 
 
@@ -55,25 +55,50 @@ opt_parser = OptionParser.new do |opts|
 		options[:author] = author
 	end
 
-	opts.on("-f", "--from=", "Specify from-year") do |fromyear|
-		options[:fromYear] = fromyear.to_i
+	opts.on("-u", "--collectionUnit=", "Specify collection unit year or month default:#{options[:collectionUnit]}") do |colllectionUnit|
+		colllectionUnit.downcase!
+		case colllectionUnit
+		when "month", "year"
+			options[:colllectionUnit] = colllectionUnit
+		else
+			options[:colllectionUnit] = "year"
+		end
 	end
 
-	opts.on("-f", "--end=", "Specify end-year") do |endYear|
-		options[:endYear] = endYear.to_i
+	opts.on("-f", "--from=", "Specify from e.g. 2023 or 2023-01") do |from|
+		options[:from] = from
+	end
+
+	opts.on("-e", "--end=", "Specify end e.g. 2023 or 2023-12") do |it|
+		options[:end] = it
 	end
 end.parse!
 
 current_time = Time.now
 current_year = current_time.year
 
-options[:fromYear] = current_year if !options[:fromYear]
-options[:endYear] = current_year if !options[:endYear]
+options[:from] = current_year if !options[:from]
+options[:end] = current_year if !options[:end]
 
-options[:endYear] = options[:fromYear] if options[:fromYear] > options[:endYear]
+options[:end] = options[:from] if options[:from] > options[:end]
 
+if ARGV.length == 1 then
+	currentDate = nil
+	endDate = nil
+	begin
+		currentDate = Date.strptime( options[:from].to_s, "%Y-%m" )
+		endDate = Date.strptime( options[:end].to_s, "%Y-%m" )
+	rescue ArgumentError
+		currentDate = Date.strptime( options[:from].to_s, "%Y" )
+		endDate = Date.strptime( options[:from].to_s, "%Y" )
+	end
 
-(options[:fromYear]..options[:endYear]).each do |year|
-	added, removed = getAddedRemovedOverGits(ARGV[0], year, options[:author])
-	puts "#{year},#{added},#{removed}"
+	deltaMonth = options[:colllectionUnit] == "year" ? 12 : 1
+
+	while currentDate <= endDate
+		added, removed = getAddedRemovedOverGits(ARGV[0], currentDate, deltaMonth, options[:author])
+		theIndex = options[:colllectionUnit] == "year" ? currentDate.strftime("%Y") : currentDate.strftime("%Y-%m")
+		puts "#{theIndex},#{added},#{removed}"
+		currentDate = currentDate >> deltaMonth
+	end
 end
