@@ -18,11 +18,11 @@ require 'optparse'
 require 'date'
 require_relative "ExecUtil"
 
-def getAddedRemovedOverGits(targetPath, from, deltaMonth, author = nil)
+def getAddedRemovedOverGits(targetPath, from, deltaMonth, gitOptions = nil, author = nil)
 	added = 0
 	removed = 0
 	author = author ? "-a #{author}" : ""
-	exec_cmd = "ruby #{File.dirname(File.expand_path(__FILE__))}/git-log-stat.rb -r -m git --duration=\"from:#{from.strftime("%Y-%m-%d")}\" --gitOpt=\"--before=#{(from >> deltaMonth).strftime("%Y-%m-%d")}\" #{author}"
+	exec_cmd = "ruby #{File.dirname(File.expand_path(__FILE__))}/git-log-stat.rb -r -m git --duration=\"from:#{from.strftime("%Y-%m-%d")}\" --gitOpt=\"--before=#{(from >> deltaMonth).strftime("%Y-%m-%d")} #{gitOptions}\" #{author}"
 	result = ExecUtil.getExecResultEachLine(exec_cmd, targetPath)
 	result.each do |aLine|
 		data = aLine.split(",")
@@ -72,6 +72,10 @@ opt_parser = OptionParser.new do |opts|
 	opts.on("-e", "--end=", "Specify end e.g. 2023 or 2023-12") do |it|
 		options[:end] = it
 	end
+
+	opts.on("-g", "--gitOpt=", "Specify additional git options") do |gitOptions|
+		options[:gitOptions] = gitOptions
+	end
 end.parse!
 
 current_time = Time.now
@@ -79,8 +83,6 @@ current_year = current_time.year
 
 options[:from] = current_year if !options[:from]
 options[:end] = current_year if !options[:end]
-
-options[:end] = options[:from] if options[:from] > options[:end]
 
 if ARGV.length == 1 then
 	currentDate = nil
@@ -93,10 +95,12 @@ if ARGV.length == 1 then
 		endDate = Date.strptime( options[:from].to_s, "%Y" )
 	end
 
+	endDate = currentDate if currentDate > endDate
+
 	deltaMonth = options[:colllectionUnit] == "year" ? 12 : 1
 
 	while currentDate <= endDate
-		added, removed = getAddedRemovedOverGits(ARGV[0], currentDate, deltaMonth, options[:author])
+		added, removed = getAddedRemovedOverGits(ARGV[0], currentDate, deltaMonth, options[:gitOptions], options[:author])
 		theIndex = options[:colllectionUnit] == "year" ? currentDate.strftime("%Y") : currentDate.strftime("%Y-%m")
 		puts "#{theIndex},#{added},#{removed}"
 		currentDate = currentDate >> deltaMonth
