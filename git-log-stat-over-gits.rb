@@ -18,11 +18,11 @@ require 'optparse'
 require 'date'
 require_relative "ExecUtil"
 
-def getAddedRemovedOverGits(targetPath, from, deltaMonth, gitOptions = nil, author = nil)
+def getAddedRemovedOverGits(targetPath, from, delta, gitOptions = nil, author = nil)
 	added = 0
 	removed = 0
 	author = author ? "-a #{author}" : ""
-	exec_cmd = "ruby #{File.dirname(File.expand_path(__FILE__))}/git-log-stat.rb -r -m git --duration=\"from:#{from.strftime("%Y-%m-%d")}\" --gitOpt=\"--before=#{(from >> deltaMonth).strftime("%Y-%m-%d")} #{gitOptions}\" #{author}"
+	exec_cmd = "ruby #{File.dirname(File.expand_path(__FILE__))}/git-log-stat.rb -r -m git --duration=\"from:#{from.strftime("%Y-%m-%d")}\" --gitOpt=\"--before=#{(from + delta).strftime("%Y-%m-%d")} #{gitOptions}\" #{author}"
 	result = ExecUtil.getExecResultEachLine(exec_cmd, targetPath)
 	result.each do |aLine|
 		data = aLine.split(",")
@@ -55,21 +55,21 @@ opt_parser = OptionParser.new do |opts|
 		options[:author] = author
 	end
 
-	opts.on("-u", "--collectionUnit=", "Specify collection unit year or month default:#{options[:collectionUnit]}") do |colllectionUnit|
+	opts.on("-u", "--collectionUnit=", "Specify collection unit year or month or day default:#{options[:colllectionUnit]}") do |colllectionUnit|
 		colllectionUnit.downcase!
 		case colllectionUnit
-		when "month", "year"
+		when "month", "year", "day"
 			options[:colllectionUnit] = colllectionUnit
 		else
 			options[:colllectionUnit] = "year"
 		end
 	end
 
-	opts.on("-f", "--from=", "Specify from e.g. 2023 or 2023-01") do |from|
+	opts.on("-f", "--from=", "Specify from e.g. 2023 or 2023-01 or 2023-01-01") do |from|
 		options[:from] = from
 	end
 
-	opts.on("-e", "--end=", "Specify end e.g. 2023 or 2023-12") do |it|
+	opts.on("-e", "--end=", "Specify end e.g. 2023 or 2023-12 or 2023-12-31") do |it|
 		options[:end] = it
 	end
 
@@ -88,21 +88,26 @@ if ARGV.length == 1 then
 	currentDate = nil
 	endDate = nil
 	begin
-		currentDate = Date.strptime( options[:from].to_s, "%Y-%m" )
-		endDate = Date.strptime( options[:end].to_s, "%Y-%m" )
+		currentDate = Date.strptime( options[:from].to_s, "%Y-%m-%d" )
+		endDate = Date.strptime( options[:end].to_s, "%Y-%m-%d" )
 	rescue ArgumentError
-		currentDate = Date.strptime( options[:from].to_s, "%Y" )
-		endDate = Date.strptime( options[:from].to_s, "%Y" )
+		begin
+			currentDate = Date.strptime( options[:from].to_s, "%Y-%m" )
+			endDate = Date.strptime( options[:end].to_s, "%Y-%m" )
+		rescue ArgumentError
+			currentDate = Date.strptime( options[:from].to_s, "%Y" )
+			endDate = Date.strptime( options[:from].to_s, "%Y" )
+		end
 	end
 
 	endDate = currentDate if currentDate > endDate
 
-	deltaMonth = options[:colllectionUnit] == "year" ? 12 : 1
+	delta = options[:colllectionUnit] == "year" ? 365 : options[:colllectionUnit] == "month" ? 12 : 1
 
 	while currentDate <= endDate
-		added, removed = getAddedRemovedOverGits(ARGV[0], currentDate, deltaMonth, options[:gitOptions], options[:author])
-		theIndex = options[:colllectionUnit] == "year" ? currentDate.strftime("%Y") : currentDate.strftime("%Y-%m")
+		added, removed = getAddedRemovedOverGits(ARGV[0], currentDate, delta, options[:gitOptions], options[:author])
+		theIndex = options[:colllectionUnit] == "year" ? currentDate.strftime("%Y") : options[:colllectionUnit] == "month" ? currentDate.strftime("%Y-%m") : currentDate.strftime("%Y-%m-%d")
 		puts "#{theIndex},#{added},#{removed}"
-		currentDate = currentDate >> deltaMonth
+		currentDate = currentDate + delta
 	end
 end
