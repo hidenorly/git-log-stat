@@ -18,11 +18,23 @@ require 'optparse'
 require 'date'
 require_relative "ExecUtil"
 
-def getAddedRemovedOverGits(targetPath, from, delta, gitOptions = nil, author = nil)
+def getNextDayWithNextDuration(currentDate, duration = "year")
+	case duration
+	when "year"
+		currentDate = currentDate >> 12
+	when "month"
+		currentDate = currentDate >> 1
+	when "day"
+		currentDate = currentDate + 1
+	end
+	return currentDate
+end
+
+def getAddedRemovedOverGits(targetPath, from, colllectionUnit, gitOptions = nil, author = nil)
 	added = 0
 	removed = 0
 	author = author ? "-a #{author}" : ""
-	exec_cmd = "ruby #{File.dirname(File.expand_path(__FILE__))}/git-log-stat.rb -r -m git --duration=\"from:#{from.strftime("%Y-%m-%d")}\" --gitOpt=\"--before=#{(from + delta).strftime("%Y-%m-%d")} #{gitOptions}\" #{author}"
+	exec_cmd = "ruby #{File.dirname(File.expand_path(__FILE__))}/git-log-stat.rb -r -m git --duration=\"from:#{from.strftime("%Y-%m-%d")}\" --gitOpt=\"--before=#{getNextDayWithNextDuration(from, colllectionUnit).strftime("%Y-%m-%d")} #{gitOptions}\" #{author}"
 	result = ExecUtil.getExecResultEachLine(exec_cmd, targetPath)
 	result.each do |aLine|
 		data = aLine.split(",")
@@ -102,12 +114,10 @@ if ARGV.length == 1 then
 
 	endDate = currentDate if currentDate > endDate
 
-	delta = options[:colllectionUnit] == "year" ? 365 : options[:colllectionUnit] == "month" ? 12 : 1
-
 	while currentDate <= endDate
-		added, removed = getAddedRemovedOverGits(ARGV[0], currentDate, delta, options[:gitOptions], options[:author])
+		added, removed = getAddedRemovedOverGits(ARGV[0], currentDate, options[:colllectionUnit], options[:gitOptions], options[:author])
 		theIndex = options[:colllectionUnit] == "year" ? currentDate.strftime("%Y") : options[:colllectionUnit] == "month" ? currentDate.strftime("%Y-%m") : currentDate.strftime("%Y-%m-%d")
 		puts "#{theIndex},#{added},#{removed}"
-		currentDate = currentDate + delta
+		currentDate = getNextDayWithNextDuration(currentDate, options[:colllectionUnit])
 	end
 end
