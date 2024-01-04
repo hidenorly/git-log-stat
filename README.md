@@ -2,7 +2,7 @@
 
 This script enables you to analyze git log statistics easily with your expected formats such as markdown, csv and json.
 
-# Basic usage : per-file analysis
+## Basic usage : per-file analysis
 
 ```
 % ruby git-log-stat.rb . --outputFormat=markdown
@@ -23,7 +23,7 @@ You can also specify multiple gits as ```% ruby git-log-stat.rb ~/work/pj1 ~/wor
 Note that ```~/work/pj1```, ```~/work/pj2``` and ```~/work/pj3``` are .git managed directory.
 
 
-# Usage : per-git analysis
+## Usage : per-git analysis
 
 ```
 % ruby git-log-stat.rb . --outputFormat=json --mode=git
@@ -32,7 +32,7 @@ Note that ```~/work/pj1```, ```~/work/pj2``` and ```~/work/pj3``` are .git manag
 ]
 ```
 
-# Usage : activity ranking with filename as markdonw
+## Usage : activity ranking with filename as markdonw
 
 ```
 % ruby git-log-stat.rb . --outputFormat=markdown --sortKey=largestUnit --calcUnit=per-day --sort=straight --disableGitPathOutput
@@ -67,7 +67,7 @@ Note that ```~/work/pj1```, ```~/work/pj2``` and ```~/work/pj3``` are .git manag
 duration=16 means 16 days a go.
 
 
-# Usage : activity ranking as markdown
+## Usage : activity ranking as markdown
 
 ```
 % ruby git-log-stat.rb . --outputFormat=markdown --sortKey=largestUnit --calcUnit=per-day --sort=straight --disableGitPathOutput --mode=git
@@ -91,7 +91,7 @@ duration=16 means 16 days a go.
 
 16 days ago is most active day in the git.
 
-# Usage : activity ranking as csv
+## Usage : activity ranking as csv
 
 ```
 % ruby git-log-stat.rb . --outputFormat=csv --sortKey=largestUnit --calcUnit=per-day --sort=straight --disableGitPathOutput --mode=git
@@ -111,7 +111,7 @@ duration=16 means 16 days a go.
 "7", 17, 0
 ```
 
-＃ Usage : active git ranking as csv
+## Usage : active git ranking as csv
 
 ```
 % ruby git-log-stat.rb --outputFormat=csv --sortKey=largestGit  --sort=straight . ~/work/audioframework --mode=git
@@ -119,7 +119,7 @@ duration=16 means 16 days a go.
 ".", 1682, 238
 ```
 
-# Usage : per-author ranking as markdown
+## Usage : per-author ranking as markdown
 
 ```
 % ruby git-log-stat.rb --outputFormat=markdown --sortKey=largestGit  --sort=straight  --mode=author .
@@ -128,7 +128,7 @@ duration=16 means 16 days a go.
 | . | hidenorly | 1682 | 238 |
 ```
 
-# Usage : per-git ranking with --author as markdown
+## Usage : per-git ranking with --author as markdown
 
 ```
 % ruby git-log-stat.rb --outputFormat=markdown --sortKey=largestGit --sort=straight --mode=git . ~/work/android/s --author="xxx.com"
@@ -141,7 +141,7 @@ duration=16 means 16 days a go.
 ..snip..
 ```
 
-# Usage : per-duration & per-git analysis with --author as csv
+## Usage : per-duration & per-git analysis with --author as csv
 
 ```
 % ruby git-log-stat.rb --mode=duration --calcUnit=per-month --duration=from:2021-1-1 ~/work/android/s --author="xxxx.com" --outputFormat=csv
@@ -152,7 +152,7 @@ duration=16 means 16 days a go.
 ..snip..
 ```
 
-# Usage : per-duration analysis with --author as csv
+## Usage : per-duration analysis with --author as csv
 
 ```
 % ruby git-log-stat.rb --mode=duration --calcUnit=per-month --duration=from:2021-1-1 ~/work/android/s --author="xxxx.com" --disableGitPathOutput --outputFormat=csv
@@ -165,7 +165,7 @@ duration=16 means 16 days a go.
 10, 1, 1
 ```
 
-# Usage : per-duration active analysis with --author as json
+## Usage : per-duration active analysis with --author as json
 
 ```
 % ruby git-log-stat.rb --mode=duration --calcUnit=per-month --duration=from:2021-1-1 ~/work/android/s --author="xxxx.com" --disableGitPathOutput --outputFormat=json --sort=straight --sortKey=largestUnit
@@ -180,11 +180,38 @@ duration=16 means 16 days a go.
 ]
 ```
 
-# Usage : per-duration active analysis for multiple gits
+## Usage : per-duration active analysis for multiple gits
 
 ```
 % ruby git-log-stat.rb --mode=duration --calcUnit=per-day --duration=from:2021-04-15  --outputFormat=csv --sort=straight --sortKey=largestFile -r ~/work/github --disableGitPathOutput
 ```
+
+# git-log-stat-over-gits.rb
+
+This tool can report the statistics of added/removed lines in specified duration over gits.
+Note that this tool enumerates the gits under the specified path.
+
+## Usage : duration year
+
+```
+ruby git-log-stat-over-gits.rb -f 2022-01-01 -e 2023-12-31 -u year ~/work/github -a hidenorly
+2022,34260,5704
+2023,35717,2673
+```
+
+## Usage : duration month
+
+```
+% ruby git-log-stat-over-gits.rb -f 2023-12 -e 2024-01 -u month ~/work/github
+```
+
+## Usage : duration day
+
+```
+% ruby git-log-stat-over-gits.rb -f 2023-12-01 -e 2024-01-01 -u day ~/work/github
+```
+
+
 
 # TODOs
 
