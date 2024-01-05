@@ -550,11 +550,11 @@ opt_parser = OptionParser.new do |opts|
 		options[:calcUnit] = calcUnit
 	end
 
-	opts.on("-o", "--gitOpt=", "Specify git options --gitOpt='--oneline', etc.") do |gitOptions|
+	opts.on("-g", "--gitOpt=", "Specify git options --gitOpt='--oneline', etc.") do |gitOptions|
 		options[:gitOptions] = gitOptions
 	end
 
-	opts.on("", "--outputFormat=", "Specify markdown or csv or json (default:#{options[:outputFormat]})") do |outputFormat|
+	opts.on("-o", "--outputFormat=", "Specify markdown or csv or json (default:#{options[:outputFormat]})") do |outputFormat|
 		outputFormat.strip!
 		outputFormat.downcase!
 		options[:outputFormat] = outputFormat if outputFormat == "csv" || outputFormat == "markdown" || outputFormat == "json"
