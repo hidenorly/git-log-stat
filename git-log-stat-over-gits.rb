@@ -1,6 +1,6 @@
 #!/usr/bin/ruby
 
-# Copyright 2023 hidenory
+# Copyright 2023, 2024 hidenory
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +17,22 @@
 require 'optparse'
 require 'date'
 require_relative "ExecUtil"
+require_relative "Reporter"
+
+
+def getDateFromDateString(dateString)
+	result = Time.now
+	begin
+		result = Date.strptime( dateString, "%Y-%m-%d" )
+	rescue ArgumentError
+		begin
+			result = Date.strptime( dateString, "%Y-%m" )
+		rescue ArgumentError
+			result = Date.strptime( dateString, "%Y" )
+		end
+	end
+	return result
+end
 
 def getNextDayWithNextDuration(currentDate, duration = "year")
 	case duration
@@ -93,31 +109,27 @@ end.parse!
 current_time = Time.now
 current_year = current_time.year
 
-options[:from] = current_year if !options[:from]
-options[:end] = current_year if !options[:end]
+options[:from] = current_year if options[:from] == nil
+options[:end] = current_year if options[:end] == nil
 
 if ARGV.length == 1 then
 	currentDate = nil
 	endDate = nil
-	begin
-		currentDate = Date.strptime( options[:from].to_s, "%Y-%m-%d" )
-		endDate = Date.strptime( options[:end].to_s, "%Y-%m-%d" )
-	rescue ArgumentError
-		begin
-			currentDate = Date.strptime( options[:from].to_s, "%Y-%m" )
-			endDate = Date.strptime( options[:end].to_s, "%Y-%m" )
-		rescue ArgumentError
-			currentDate = Date.strptime( options[:from].to_s, "%Y" )
-			endDate = Date.strptime( options[:from].to_s, "%Y" )
-		end
-	end
+	currentDate = getDateFromDateString(options[:from].to_s)
+	endDate = getDateFromDateString(options[:end].to_s)
 
 	endDate = currentDate if currentDate > endDate
+
+	reporter = CsvReporter.new(nil)
+	result = []
 
 	while currentDate <= endDate
 		added, removed = getAddedRemovedOverGits(ARGV[0], currentDate, options[:colllectionUnit], options[:gitOptions], options[:author])
 		theIndex = options[:colllectionUnit] == "year" ? currentDate.strftime("%Y") : options[:colllectionUnit] == "month" ? currentDate.strftime("%Y-%m") : currentDate.strftime("%Y-%m-%d")
-		puts "#{theIndex},#{added},#{removed}"
+		result.append( [theIndex.to_s, added, removed] ) #puts "#{theIndex},#{added},#{removed}"
 		currentDate = getNextDayWithNextDuration(currentDate, options[:colllectionUnit])
 	end
+
+	reporter.report(result)
+	reporter.close()
 end
