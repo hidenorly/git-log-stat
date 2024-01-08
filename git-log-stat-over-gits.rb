@@ -19,38 +19,39 @@ require 'date'
 require_relative "ExecUtil"
 require_relative "Reporter"
 
-
-def getDateFromDateString(dateString)
-	result = Time.now
-	begin
-		result = Date.strptime( dateString, "%Y-%m-%d" )
-	rescue ArgumentError
+class DateUtil
+	def self.getDateFromDateString(dateString)
+		result = Time.now
 		begin
-			result = Date.strptime( dateString, "%Y-%m" )
+			result = Date.strptime( dateString, "%Y-%m-%d" )
 		rescue ArgumentError
-			result = Date.strptime( dateString, "%Y" )
+			begin
+				result = Date.strptime( dateString, "%Y-%m" )
+			rescue ArgumentError
+				result = Date.strptime( dateString, "%Y" )
+			end
 		end
+		return result
 	end
-	return result
-end
 
-def getNextDayWithNextDuration(currentDate, duration = "year")
-	case duration
-	when "year"
-		currentDate = currentDate >> 12
-	when "month"
-		currentDate = currentDate >> 1
-	when "day"
-		currentDate = currentDate + 1
+	def self.getNextDayWithNextDuration(currentDate, duration = "year")
+		case duration
+		when "year"
+			currentDate = currentDate >> 12
+		when "month"
+			currentDate = currentDate >> 1
+		when "day"
+			currentDate = currentDate + 1
+		end
+		return currentDate
 	end
-	return currentDate
 end
 
 def getAddedRemovedOverGits(targetPath, from, colllectionUnit, gitOptions = nil, author = nil)
 	added = 0
 	removed = 0
 	author = author ? "-a #{author}" : ""
-	exec_cmd = "ruby #{File.dirname(File.expand_path(__FILE__))}/git-log-stat.rb -r -m git --duration=\"from:#{from.strftime("%Y-%m-%d")}\" --gitOpt=\"--before=#{getNextDayWithNextDuration(from, colllectionUnit).strftime("%Y-%m-%d")} #{gitOptions}\" #{author}"
+	exec_cmd = "ruby #{File.dirname(File.expand_path(__FILE__))}/git-log-stat.rb -r -m git --duration=\"from:#{from.strftime("%Y-%m-%d")}\" --gitOpt=\"--before=#{DateUtil.getNextDayWithNextDuration(from, colllectionUnit).strftime("%Y-%m-%d")} #{gitOptions}\" #{author}"
 	result = ExecUtil.getExecResultEachLine(exec_cmd, targetPath)
 	result.each do |aLine|
 		data = aLine.split(",")
@@ -115,8 +116,8 @@ options[:end] = current_year if options[:end] == nil
 if ARGV.length == 1 then
 	currentDate = nil
 	endDate = nil
-	currentDate = getDateFromDateString(options[:from].to_s)
-	endDate = getDateFromDateString(options[:end].to_s)
+	currentDate = DateUtil.getDateFromDateString(options[:from].to_s)
+	endDate = DateUtil.getDateFromDateString(options[:end].to_s)
 
 	endDate = currentDate if currentDate > endDate
 
@@ -127,7 +128,7 @@ if ARGV.length == 1 then
 		added, removed = getAddedRemovedOverGits(ARGV[0], currentDate, options[:colllectionUnit], options[:gitOptions], options[:author])
 		theIndex = options[:colllectionUnit] == "year" ? currentDate.strftime("%Y") : options[:colllectionUnit] == "month" ? currentDate.strftime("%Y-%m") : currentDate.strftime("%Y-%m-%d")
 		result.append( [theIndex.to_s, added, removed] ) #puts "#{theIndex},#{added},#{removed}"
-		currentDate = getNextDayWithNextDuration(currentDate, options[:colllectionUnit])
+		currentDate = DateUtil.getNextDayWithNextDuration(currentDate, options[:colllectionUnit])
 	end
 
 	reporter.report(result)
