@@ -75,6 +75,7 @@ options = {
 	:end => nil,
 }
 
+reporter = CsvReporter
 
 opt_parser = OptionParser.new do |opts|
 	cmds = ""
@@ -105,6 +106,18 @@ opt_parser = OptionParser.new do |opts|
 	opts.on("-g", "--gitOpt=", "Specify additional git options") do |gitOptions|
 		options[:gitOptions] = gitOptions
 	end
+
+	opts.on("-o", "--outputFormat=", "Specify markdown or csv or json (default:#{options[:outputFormat]})") do |outputFormat|
+		outputFormat.strip!
+		outputFormat.downcase!
+		case outputFormat
+		when "csv"
+			reporter = CsvReporter
+		when "markdown"
+			reporter = MarkdownReporter
+		end
+		options[:outputFormat] = outputFormat
+	end
 end.parse!
 
 current_time = Time.now
@@ -121,7 +134,7 @@ if ARGV.length == 1 then
 
 	endDate = currentDate if currentDate > endDate
 
-	reporter = CsvReporter.new(nil)
+	reporter = reporter.new(nil)
 	result = []
 
 	while currentDate <= endDate
