@@ -115,6 +115,8 @@ opt_parser = OptionParser.new do |opts|
 			reporter = CsvReporter
 		when "markdown"
 			reporter = MarkdownReporter
+		when "xml"
+			reporter = XmlReporter
 		end
 		options[:outputFormat] = outputFormat
 	end
@@ -140,7 +142,11 @@ if ARGV.length == 1 then
 	while currentDate <= endDate
 		added, removed = getAddedRemovedOverGits(ARGV[0], currentDate, options[:colllectionUnit], options[:gitOptions], options[:author])
 		theIndex = options[:colllectionUnit] == "year" ? currentDate.strftime("%Y") : options[:colllectionUnit] == "month" ? currentDate.strftime("%Y-%m") : currentDate.strftime("%Y-%m-%d")
-		result.append( [theIndex.to_s, added, removed] ) #puts "#{theIndex},#{added},#{removed}"
+		if options[:outputFormat] == "xml" then
+			result.append( [{:index=>theIndex.to_s, :added=>added, :removed=>removed}] )
+		else
+			result.append( {:index=>theIndex.to_s, :added=>added, :removed=>removed} )  #puts "#{theIndex},#{added},#{removed}"
+		end
 		currentDate = DateUtil.getNextDayWithNextDuration(currentDate, options[:colllectionUnit])
 	end
 
