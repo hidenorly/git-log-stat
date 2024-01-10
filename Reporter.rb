@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+require 'json'
 require_relative 'FileUtil'
 
 class Reporter
@@ -112,6 +113,7 @@ class Reporter
 	end
 end
 
+
 class MarkdownReporter < Reporter
 	def initialize(reportOutPath, enableAppend = false)
 		super(reportOutPath, enableAppend)
@@ -179,6 +181,7 @@ class MarkdownReporter < Reporter
 	end
 end
 
+
 class CsvReporter < Reporter
 	def initialize(reportOutPath, enableAppend = false)
 		super(reportOutPath, enableAppend)
@@ -229,6 +232,7 @@ class CsvReporter < Reporter
 		end
 	end
 end
+
 
 class XmlReporter < Reporter
 	def initialize(reportOutPath, enableAppend = false)
@@ -343,5 +347,36 @@ class XmlReporter < Reporter
 				@outStream.puts "#{" "*indent}#{aVal}" if @outStream
 			end
 		end
+	end
+end
+
+
+class JsonReporter < Reporter
+	def initialize(reportOutPath, enableAppend = false)
+		super(reportOutPath, enableAppend)
+	end
+	def titleOut(title)
+		if @outStream
+			@outStream.puts "\# #{title}"
+		end
+	end
+
+	def subTitleOut(title, level = 2)
+		if @outStream
+			@outStream.puts "\# #{title}"
+		end
+	end
+
+	def ensureCorrespondingExt(path)
+		return path.end_with?(".json") ? path : "#{path}.json"
+	end
+
+	def report(data, outputSections=nil, options={})
+		jsonString = ""
+		begin
+			jsonString = JSON.pretty_generate(data, :indent => '    ')
+		rescue ex
+		end
+		@outStream.puts jsonString if @outStream
 	end
 end

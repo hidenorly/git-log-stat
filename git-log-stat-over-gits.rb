@@ -107,7 +107,7 @@ opt_parser = OptionParser.new do |opts|
 		options[:gitOptions] = gitOptions
 	end
 
-	opts.on("-o", "--outputFormat=", "Specify markdown or csv or json (default:#{options[:outputFormat]})") do |outputFormat|
+	opts.on("-o", "--outputFormat=", "Specify markdown or csv or xml or json (default:#{options[:outputFormat]})") do |outputFormat|
 		outputFormat.strip!
 		outputFormat.downcase!
 		case outputFormat
@@ -117,6 +117,8 @@ opt_parser = OptionParser.new do |opts|
 			reporter = MarkdownReporter
 		when "xml"
 			reporter = XmlReporter
+		when "json"
+			reporter = JsonReporter
 		end
 		options[:outputFormat] = outputFormat
 	end
