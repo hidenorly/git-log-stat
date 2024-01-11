@@ -15,6 +15,8 @@
 # limitations under the License.
 
 require 'json'
+require 'rexml/document'
+require 'rexml/formatters/pretty'
 require_relative 'FileUtil'
 
 class Reporter
@@ -347,6 +349,92 @@ class XmlReporter < Reporter
 				@outStream.puts "#{" "*indent}#{aVal}" if @outStream
 			end
 		end
+	end
+end
+
+
+class XmlReporter2 < Reporter
+	def initialize(reportOutPath, enableAppend = false)
+		super(reportOutPath, enableAppend)
+	end
+
+	def titleOut(title)
+		if @outStream then
+			@outStream.puts "<!-- #{title} --/>"
+			@outStream.puts ""
+		end
+	end
+
+	def subTitleOut(title, level = 2)
+		titleOut(title)
+	end
+
+	def ensureCorrespondingExt(path)
+		return path.end_with?(".xml") ? path : "#{path}.xml"
+	end
+
+	def _subReport(data, parent = nil, xml = nil)
+		xml ||= REXML::Document.new
+		root = parent || xml.add_element("root")
+
+		if data.is_a?(Hash) then
+			itemElement = REXML::Element.new("item")
+
+			data.each do |key, value|
+				element = REXML::Element.new(key.to_s)
+				if value.is_a?(Hash) then
+					begin
+						root.add_element(element)
+					rescue
+						root.add_element(itemElement)
+						itemElement.add_element(element)
+					end
+					_subReport(value, element, xml)
+				elsif value.is_a?(Array) then
+					root.add_element(element)
+					_subReport(value, element, xml)
+				else
+					element.text = value.to_s
+					begin
+						root.add_element(element)
+					rescue
+						root.add_element(itemElement)
+						itemElement.add_element(element)
+					end
+				end
+			end
+		elsif data.is_a?(Array) then
+			rootArrayElement = REXML::Element.new("array")
+			root.add_element(rootArrayElement)
+			data.each do |item|
+				if item.is_a?(Hash) then
+					itemElement = REXML::Element.new("item")
+					rootArrayElement.add_element(itemElement)
+					_subReport(item, itemElement, xml)
+				elsif item.is_a?(Array) then
+					_subReport(item, rootArrayElement, xml)
+				else
+					valueElement = REXML::Element.new("value")
+					valueElement.text = item.to_s
+					rootArrayElement.add_element(valueElement)
+				end
+			end
+		else
+			valueElement = REXML::Element.new("value")
+			valueElement.text = data.to_s
+			root.add_element(valueElement)
+		end
+
+		return xml
+	end
+
+	def report(data, outputSections=nil, options={})
+		xml = _subReport(data)
+		formatter = REXML::Formatters::Pretty.new(4)
+		formatter.compact = true
+		result = ""
+		formatter.write(xml, result)
+		puts result
 	end
 end
 
