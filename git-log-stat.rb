@@ -1,6 +1,6 @@
 #!/usr/bin/ruby
 
-# Copyright 2022, 2023 hidenory
+# Copyright 2022, 2023, 2025 hidenory
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -416,11 +416,11 @@ class ExecGitLogStat < TaskAsync
 		result = {}
 
 		if( FileTest.directory?(@gitPath) ) then
-			git_log_result = GitUtil.getLogNumStat(@gitPath, COMMIT_SEPARATOR, @gitOptions);
+			git_log_result = GitUtil.getLogNumStat(@gitPath, COMMIT_SEPARATOR, @gitOptions, @options[:authorEmail]);
 			if @options[:mode]=="author" then
 				result = GitUtil.parseNumStatPerAuthor( git_log_result, COMMIT_SEPARATOR )
 			else
-				result = GitUtil.parseNumStatPefFile( git_log_result, COMMIT_SEPARATOR )
+				result = GitUtil.parseNumStatPerFile( git_log_result, COMMIT_SEPARATOR )
 			end
 		else
 			puts "\n#{@gitPath} is not existed)" if @options[:verbose]
@@ -529,6 +529,7 @@ options = {
 	:sort => "straight",
 	:sortKey => "largestFile",
 	:author => nil,
+	:authorEmail => false,
 	:recursive => false,
 	:numOfThreads => TaskManagerAsync.getNumberOfProcessor(),
 }
@@ -562,6 +563,10 @@ opt_parser = OptionParser.new do |opts|
 
 	opts.on("-a", "--author=", "Specify author if want to filter with") do |author|
 		options[:author] = author
+	end
+
+	opts.on("-ae", "--authorEmail", "Enable to output email as author (default:#{options[:authorEmail]})") do
+		options[:authorEmail] = true
 	end
 
 	opts.on("-s", "--sort=", "Specify sort mode: none, straight, reverse (default:#{options[:sort]})") do |sort|
@@ -615,7 +620,7 @@ if options[:recursive] then
 		paths = []
 		FileUtil.iteratePath(aPath, "", paths, true, true)
 		paths.each do |aCandidatePath|
-			if GitUtil.isGitPath( aCandidatePath ) then
+			if GitUtil.isGitDirectory( aCandidatePath ) then
 				_gitPath << aCandidatePath
 			end
 		end

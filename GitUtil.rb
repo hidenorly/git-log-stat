@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 
-# Copyright 2022, 2023 hidenory
+# Copyright 2022, 2023, 2025 hidenory
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,19 +25,31 @@ class GitUtil
 		return File.directory?("#{gitPath}/.git")
 	end
 
+	def self.isGitPath(gitPath)
+		return isGitDirectory(gitPath)
+	end
+
 	def self.isCommitId?(sha1)
 		return sha1.to_s.match?(/[0-9a-f]{5,40}/)
 	end
 
-	def self.ensureSha1(sha1)
+	def self.ensureSha1(sha1, gitPath=nil)
+		# TODO : ensure SHA1
+		if gitPath && sha1.to_s.downcase == "tail" then
+			sha1 = getTailCommitId(gitPath)
+		end
+		return sha1
+	end
+
+	def self._ensureSha1(sha1)
 		sha= sha1.to_s.match(/[0-9a-f]{5,40}/)
 		return sha ? sha[0] : nil
 	end
 
-	def self.ensureShas(shas)
+	def self.ensureShas(shas, gitPath=nil)
 		result = []
 		shas.each do | aSha |
-			result << ensureSha1(aSha)
+			result << ensureSha1(aSha, gitPath)
 		end
 
 		return result
@@ -91,11 +103,11 @@ class GitUtil
 
 	def self.getHeadCommitId(gitPath)
 		result = nil
-		exec_cmd = "git rev-list HEAD | head -n 1"
+		exec_cmd = "git rev-list HEAD -1"
 		exec_cmd += " 2>/dev/null"
 
 		result = ExecUtil.getExecResultEachLine(exec_cmd, gitPath)
-		return ensureSha1(result[0])
+		return ensureSha1(result.to_s)
 	end
 
 	def self._getTailCommits(gitPath, count = 1)
@@ -108,7 +120,7 @@ class GitUtil
 	end
 
 	def self.getTailCommitId(gitPath)
-		return _getTailCommits( gitPath, 1 )[0]
+		return _getTailCommits( gitPath, 1 ).to_s
 	end
 
 	def self.getActualTailCommitId(gitPath)
@@ -228,8 +240,13 @@ class GitUtil
 	end
 
 
-	def self.getLogNumStat(gitPath, separator="#####", gitOptions=nil)
-		exec_cmd = "git log --numstat --pretty=\"#{separator}:%h:%an:%s\""
+	def self.getLogNumStat(gitPath, separator="#####", gitOptions=nil, isAuthorEmail=false)
+		exec_cmd = "git log --numstat"
+		if isAuthorEmail then
+			exec_cmd += " --pretty=\"#{separator}:%h:%ae:%s\""
+		else
+			exec_cmd += " --pretty=\"#{separator}:%h:%an:%s\""
+		end
 		exec_cmd += " #{gitOptions}" if gitOptions
 		exec_cmd += " 2>/dev/null"
 
