@@ -44,7 +44,7 @@ end
 
 
 class ResultCollector
-	def initialize( mode, sort, sortKey, outputFormat, enableGitPathOutput, enableDurationOutput )
+	def initialize( mode, sort, sortKey, outputFormat, enableGitPathOutput, enableDurationOutput, countMax=nil )
 		@result = {}
 		@_mutex = Mutex.new
 		@mode = mode
@@ -53,6 +53,7 @@ class ResultCollector
 		@outputFormat = outputFormat
 		@enableGitPathOutput = enableGitPathOutput
 		@enableDurationOutput = enableDurationOutput
+		@countMax = countMax
 	end
 
 	def onResult( gitPath, duration, result )
@@ -342,6 +343,9 @@ class ResultCollector
 				if result.has_key?( gitPath ) then
 					tmp = result[ gitPath ]
 				end
+				if @countMax!=nil then
+					aResult = aResult.take(@countMax.to_i)
+				end
 				tmp[duration] = aResult
 				result[gitPath] = tmp
 			end
@@ -531,6 +535,7 @@ options = {
 	:author => nil,
 	:authorEmail => false,
 	:recursive => false,
+	:countMax => nil,
 	:numOfThreads => TaskManagerAsync.getNumberOfProcessor(),
 }
 
@@ -577,6 +582,10 @@ opt_parser = OptionParser.new do |opts|
 		options[:sortKey] = sortKey
 	end
 
+	opts.on("-n", "--countMax=", "Specify output max count if you want to limit") do |countMax|
+		options[:countMax] = countMax
+	end
+
 	opts.on("", "--disableGitPathOutput", "Specify if you don't want to output gitPath as 1st col.") do |disableGitPathOutput|
 		options[:enableGitPathOutput] = false
 	end
@@ -598,7 +607,7 @@ end.parse!
 # common
 taskMan = TaskManagerAsync.new( options[:numOfThreads].to_i )
 
-resultCollector = ResultCollector.new( options[:mode], options[:sort], options[:sortKey], options[:outputFormat], options[:enableGitPathOutput], (options[:duration] != "full" || options[:calcUnit]!="full") )
+resultCollector = ResultCollector.new( options[:mode], options[:sort], options[:sortKey], options[:outputFormat], options[:enableGitPathOutput], (options[:duration] != "full" || options[:calcUnit]!="full"), options[:countMax] )
 
 gitPaths = ARGV.clone()
 gitPaths.push(".") if gitPaths.empty?
