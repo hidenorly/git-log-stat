@@ -374,6 +374,8 @@ class ResultCollector
 			when "reverse"
 				result = result.sort{|(aKey, a), (bKey, b)|( ResultCollector._calcAllOfAddedRemovedOverDurations(a) <=> ResultCollector._calcAllOfAddedRemovedOverDurations(b) )}
 			end
+		else
+			result = result.sort{|(aKey, a), (bKey, b)|( aKey.downcase() <=> bKey.downcase() )}
 		end
 		@result = result
 	end
@@ -497,27 +499,68 @@ end
 
 class RepoUtil
 	DEF_REPOPATH = "/.repo"
+
 	DEF_MANIFESTPATH = "#{DEF_REPOPATH}/manifests"
-	DEF_MANIFESTFILE = "default.xml"
-	DEF_MANIFESTFILE2 = "manifest.xml"
+	DEF_MANIFESTFILE = "manifest.xml"
+	DEF_MANIFESTFILE2 = DEF_MANIFESTFILE
+	DEF_MANIFESTFILE_DIRS = [
+		"/.repo/",
+		"/.repo/manifests/"
+	]
 
-	def self.getGitPathesFromManifest(basePath, manifestFile=DEF_MANIFESTFILE2)
-		pathes = []
-		manifestPath = "#{basePath}#{DEF_MANIFESTPATH}/#{DEF_MANIFESTFILE}"
-		manifestPath = "#{basePath}#{DEF_MANIFESTPATH}/#{DEF_MANIFESTFILE2}" if !FileTest.exist?(manifestPath)
-		manifestPath = "#{basePath}#{DEF_REPOPATH}/#{DEF_MANIFESTFILE}" if !FileTest.exist?(manifestPath)
-		manifestPath = "#{basePath}#{DEF_REPOPATH}/#{DEF_MANIFESTFILE2}" if !FileTest.exist?(manifestPath)
+	def self.isRepoDirectory?(basePath)
+		return Dir.exist?(basePath + DEF_MANIFESTPATH)
+	end
 
-		if FileTest.exist?(manifestPath) then
-			doc = REXML::Document.new( open(manifestPath) )
-
-			doc.elements.each("manifest/project[@name]") do |anElement|
-				aPath = anElement.attributes["path"] ? anElement.attributes["path"] : anElement.attributes["name"]
-				pathes << "#{basePath}/#{aPath}"
+	def self.getAvailableManifestPath(basePath, manifestFilename)
+		DEF_MANIFESTFILE_DIRS.each do |aDir|
+			path = basePath + aDir.to_s + manifestFilename
+			if FileTest.exist?(path) then
+				return path
 			end
 		end
+		return nil
+	end
 
-		return pathes
+	def self.getPathesFromManifestSub(basePath, manifestFilename, pathGitPath, pathFilter, groupFilter)
+		manifestPath = getAvailableManifestPath(basePath, manifestFilename)
+		if manifestPath && FileTest.exist?(manifestPath) then
+			doc = REXML::Document.new(open(manifestPath))
+			doc.elements.each("manifest/include[@name]") do |anElement|
+				getPathesFromManifestSub(basePath, anElement.attributes["name"], pathGitPath, pathFilter, groupFilter)
+			end
+			doc.elements.each("manifest/project[@path]") do |anElement|
+				thePath = anElement.attributes["path"].to_s
+				theGitPath = anElement.attributes["name"].to_s
+				if pathFilter.empty? || ( !pathFilter.to_s.empty? && thePath.match( pathFilter.to_s ) ) then
+					theGroups = anElement.attributes["groups"].to_s
+					if theGroups.empty? || groupFilter.empty? || ( !groupFilter.to_s.empty? && theGroups.match( groupFilter.to_s ) ) then
+						pathGitPath[thePath] = theGitPath
+					end
+				end
+			end
+		end
+	end
+
+	def self.getPathesFromManifest(basePath, pathFilter="", groupFilter="")
+		pathGitPath = {}
+
+		getPathesFromManifestSub(basePath, DEF_MANIFESTFILE, pathGitPath, pathFilter, groupFilter)
+
+		pathes = []
+		pathGitPath.keys.each do |aPath|
+			pathes << "#{basePath}/#{aPath}"
+		end
+
+		return pathes, pathGitPath
+	end
+
+
+	def self.getGitPathesFromManifest(basePath, manifestFile=DEF_MANIFESTFILE2)
+		pathGitPath = {}
+		getPathesFromManifestSub(basePath, manifestFile, pathGitPath, "", "")
+
+		return pathGitPath
 	end
 end
 
@@ -616,7 +659,9 @@ _gitPaths = []
 gitPaths.each do |aGitPath|
 	gitPathsInManifest = RepoUtil.getGitPathesFromManifest( aGitPath )
 	if !gitPathsInManifest.empty? then
-		_gitPaths.concat( gitPathsInManifest )
+		gitPathsInManifest.each do |relative_path, git_path|
+		   _gitPaths << "#{aGitPath}/#{relative_path}"
+		end
 	else
 		_gitPaths << aGitPath
 	end
