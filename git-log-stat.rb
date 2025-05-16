@@ -17,6 +17,7 @@
 require 'optparse'
 require 'date'
 require 'rexml/document'
+require 'set'
 require_relative "TaskManager"
 require_relative "FileUtil"
 require_relative "StrUtil"
@@ -380,6 +381,10 @@ class ResultCollector
 		@result = result
 	end
 
+	def getResults()
+		return @result
+	end
+
 	def report()
 		@_mutex.synchronize {
 			case @mode
@@ -423,7 +428,7 @@ class ExecGitLogStat < TaskAsync
 
 		if( FileTest.directory?(@gitPath) ) then
 			git_log_result = GitUtil.getLogNumStat(@gitPath, COMMIT_SEPARATOR, @gitOptions, @options[:authorEmail]);
-			if @options[:mode]=="author" then
+			if @options[:mode].start_with?("author") then
 				result = GitUtil.parseNumStatPerAuthor( git_log_result, COMMIT_SEPARATOR )
 			else
 				result = GitUtil.parseNumStatPerFile( git_log_result, COMMIT_SEPARATOR )
@@ -587,7 +592,7 @@ opt_parser = OptionParser.new do |opts|
 	cmds = ""
 	opts.banner = "Usage: #{cmds} gitDir1 gitDir2 ..."
 
-	opts.on("-m", "--mode=", "Specify analysis mode: file or git or author or duration (default:#{options[:mode]})") do |mode|
+	opts.on("-m", "--mode=", "Specify analysis mode: file or git or author or duration or author-set (default:#{options[:mode]})") do |mode|
 		options[:mode] = mode
 	end
 
@@ -613,7 +618,7 @@ opt_parser = OptionParser.new do |opts|
 		options[:author] = author
 	end
 
-	opts.on("-ae", "--authorEmail", "Enable to output email as author (default:#{options[:authorEmail]})") do
+	opts.on("-e", "--authorEmail", "Enable to output email as author (default:#{options[:authorEmail]})") do
 		options[:authorEmail] = true
 	end
 
@@ -683,13 +688,16 @@ if options[:recursive] then
 end
 
 options[:gitOptions] = GitOptionUtil.filterAuthor(options[:gitOptions], options[:author])
+# --- per duration execution
 if options[:calcUnit] == "full" then
+	# --- full duration execution
 	options[:gitOptions] = GitOptionUtil.filterDuration(options[:gitOptions], options[:duration])
 
 	gitPaths.each do |aPath|
 		taskMan.addTask( ExecGitLogStat.new( aPath, resultCollector, options[:calcUnit], options[:gitOptions], options ) )
 	end
 else
+	# --- per duration execution
 	fromDate = GitOptionUtil.getDaysFromDuration( options[:duration] )
 	calcUnit = ""
 
@@ -717,5 +725,20 @@ end
 
 taskMan.executeAll()
 taskMan.finalize()
-resultCollector.report()
+
+if options[:mode] == "author-set" then
+	authors = Set.new
+	resultCollector.getResults().each do | path, _authors |
+		_authors.each do |mode, data|
+			data.each do |author, _data|
+				authors.add(author)
+			end
+		end
+	end
+	authors.each do |author|
+		puts author
+	end
+else
+	resultCollector.report()
+end
 
